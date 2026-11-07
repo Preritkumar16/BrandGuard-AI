@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.database.session import get_db
 from app.models.organisation import Organisation
 from app.models.user import User
@@ -10,17 +11,18 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserRegister, db: Session = Depends(get_db)):
+async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     # Check if user already exists
-    existing = db.query(User).filter(User.email == user_data.email).first()
+    result = await db.execute(select(User).filter(User.email == user_data.email))
+    existing = result.scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create Organisation
     org = Organisation(name=user_data.organisation_name)
     db.add(org)
-    db.commit()
-    db.refresh(org)
+    await db.commit()
+    await db.refresh(org)
 
     # Create User
     user = User(
@@ -32,8 +34,8 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         is_active=True
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     return UserResponse(
         id=str(user.id),
@@ -45,8 +47,9 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     )
 
 @router.post("/login", response_model=Token)
-def login(form_data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.email).first()
+async def login(form_data: UserLogin, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).filter(User.email == form_data.email))
+    user = result.scalars().first()
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,7 +63,7 @@ def login(form_data: UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=str(current_user.id),
         organisation_id=str(current_user.organisation_id),

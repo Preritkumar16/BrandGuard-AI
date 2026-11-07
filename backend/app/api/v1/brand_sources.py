@@ -1,13 +1,15 @@
 import os
+import uuid
 import hashlib
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.database.session import get_db
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.models.brand_source import BrandSource
 from app.models.source_version import SourceVersion, SourceStatus
-from app.schemas.brand_source import BrandSourceResponse, SourceVersionResponse
+from app.schemas.brand_source import BrandSourceResponse
 from app.api.deps import get_current_user
 from pypdf import PdfReader
 
@@ -15,22 +17,31 @@ router = APIRouter(prefix="/sources", tags=["Brand Sources"])
 
 UPLOAD_DIR = "storage/sources"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB limit
 
 @router.post("/", response_model=BrandSourceResponse, status_code=status.HTTP_201_CREATED)
-def create_brand_source(
+async def create_brand_source(
     name: str = Form(...),
     source_type: str = Form("guideline_pdf"),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    # 1. Save uploaded file locally
-    file_location = os.path.join(UPLOAD_DIR, f"{current_user.organisation_id}_{file.filename}")
+    # 1. Validate file extension and size
+    if not file.filename or not (file.filename.endswith(".pdf") or file.filename.endswith(".txt") or file.filename.endswith(".docx")):
+        raise HTTPException(status_code=400, detail="Unsupported file format. Only PDF, TXT, and DOCX are allowed.")
+    
+    file_content = await file.read()
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds the 15MB limit.")
+
+    # 2. Save securely with a generated unique filename
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    file_location = os.path.join(UPLOAD_DIR, unique_filename)
     with open(file_location, "wb+") as file_object:
-        file_content = file.file.read()
         file_object.write(file_content)
 
-    # 2. Compute content hash & extract text
+    # 3. Compute content hash & extract text
     content_hash = hashlib.sha256(file_content).hexdigest()
     
     extracted_text = ""
@@ -49,7 +60,7 @@ def create_brand_source(
         except Exception:
             extracted_text = ""
 
-    # 3. Create Brand Source record (Tenant Isolated)
+    # 4. Create Brand Source record (Tenant Isolated)
     brand_source = BrandSource(
         organisation_id=current_user.organisation_id,
         name=name,
@@ -57,30 +68,29 @@ def create_brand_source(
         owner_user_id=current_user.id
     )
     db.add(brand_source)
-    db.commit()
-    db.refresh(brand_source)
+    await db.commit()
+    await db.refresh(brand_source)
 
-    # 4. Create Initial Source Version (v1)
+    # 5. Create Initial Source Version (v1) in DRAFT status (Strict governance rule: no auto-self-approval)
     source_version = SourceVersion(
         organisation_id=current_user.organisation_id,
         source_id=brand_source.id,
         version_number=1,
         effective_from=date.today(),
-        status=SourceStatus.APPROVED,  # Auto-approve for hackathon demo flow
+        status=SourceStatus.DRAFT,
         file_object_key=file_location,
         content_hash=content_hash,
-        extracted_text_ref=extracted_text[:500], # Store preview or full ref
-        created_by=current_user.id,
-        approved_by=current_user.id
+        extracted_text_ref=extracted_text,
+        created_by=current_user.id
     )
     db.add(source_version)
-    db.commit()
-    db.refresh(source_version)
+    await db.commit()
+    await db.refresh(source_version)
 
-    # 5. Link current version pointer
+    # 6. Link current version pointer
     brand_source.current_version_id = source_version.id
-    db.commit()
-    db.refresh(brand_source)
+    await db.commit()
+    await db.refresh(brand_source)
 
     return BrandSourceResponse(
         id=str(brand_source.id),
@@ -93,11 +103,14 @@ def create_brand_source(
     )
 
 @router.get("/", response_model=list[BrandSourceResponse])
-def list_brand_sources(
+async def list_brand_sources(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    sources = db.query(BrandSource).filter(BrandSource.organisation_id == current_user.organisation_id).all()
+    result = await db.execute(
+        select(BrandSource).filter(BrandSource.organisation_id == current_user.organisation_id)
+    )
+    sources = result.scalars().all()
     return [
         BrandSourceResponse(
             id=str(s.id),
