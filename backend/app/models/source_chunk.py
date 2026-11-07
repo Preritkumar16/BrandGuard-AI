@@ -33,7 +33,7 @@ class SourceChunk(Base):
     meta_data: Mapped[Dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False, default=dict)
     qdrant_point_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    organisation: Mapped["Organisation"] = relationship("Organisation")
+    organisation: Mapped["Organisation"] = relationship("Organisation", overlaps="chunks")
     source_version: Mapped["SourceVersion"] = relationship(
         "SourceVersion",
         back_populates="chunks",

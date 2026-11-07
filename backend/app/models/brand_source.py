@@ -30,12 +30,6 @@ class BrandSource(Base):
     owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey(
-            "source_versions.id",
-            ondelete="SET NULL",
-            use_alter=True,
-            name="fk_brand_sources_current_version_id",
-        ),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -48,6 +42,7 @@ class BrandSource(Base):
         nullable=False,
     )
 
+    # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
     owner: Mapped["User"] = relationship(
         "User",
@@ -56,7 +51,11 @@ class BrandSource(Base):
         overlaps="organisation",
     )
     current_version: Mapped[Optional["SourceVersion"]] = relationship(
-        "SourceVersion", foreign_keys=[current_version_id], post_update=True
+        "SourceVersion",
+        primaryjoin="and_(BrandSource.current_version_id == SourceVersion.id, BrandSource.id == SourceVersion.source_id, BrandSource.organisation_id == SourceVersion.organisation_id)",
+        foreign_keys=[current_version_id],
+        post_update=True,
+        overlaps="versions",
     )
     versions: Mapped[List["SourceVersion"]] = relationship(
         "SourceVersion",
@@ -72,5 +71,12 @@ class BrandSource(Base):
             ["users.id", "users.organisation_id"],
             name="fk_brand_source_owner_tenant",
             ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["current_version_id", "id", "organisation_id"],
+            ["source_versions.id", "source_versions.source_id", "source_versions.organisation_id"],
+            name="fk_brand_sources_current_version_parent_tenant",
+            ondelete="RESTRICT",
+            use_alter=True,
         ),
     )

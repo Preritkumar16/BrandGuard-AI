@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, CheckConstraint, UniqueConstraint, func
+from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, CheckConstraint, UniqueConstraint, and_, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -62,9 +62,13 @@ class Finding(Base):
         nullable=False,
     )
 
-    # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    asset_version: Mapped["AssetVersion"] = relationship("AssetVersion")
+    asset_version: Mapped["AssetVersion"] = relationship(
+        "AssetVersion",
+        primaryjoin="and_(Finding.asset_version_id == AssetVersion.id, Finding.organisation_id == AssetVersion.organisation_id)",
+        foreign_keys=[asset_version_id, organisation_id],
+        overlaps="organisation",
+    )
     evidence_links: Mapped[List["EvidenceLink"]] = relationship(
         "EvidenceLink", back_populates="finding", cascade="all, delete-orphan"
     )

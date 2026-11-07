@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Text, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, UniqueConstraint, func
+from sqlalchemy import String, Integer, Text, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, UniqueConstraint, and_, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -62,13 +62,22 @@ class AssetVersion(Base):
     # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
     asset: Mapped["Asset"] = relationship(
-        "Asset", back_populates="versions", foreign_keys=[asset_id]
+        "Asset",
+        back_populates="versions",
+        primaryjoin="and_(AssetVersion.asset_id == Asset.id, AssetVersion.organisation_id == Asset.organisation_id)",
+        foreign_keys=[asset_id, organisation_id],
+        overlaps="current_version,organisation,versions",
     )
-    creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[created_by],
+        overlaps="organisation",
+    )
 
     __table_args__ = (
         UniqueConstraint("asset_id", "version_number", name="uq_asset_version_number"),
         UniqueConstraint("id", "organisation_id", name="uq_asset_version_id_organisation"),
+        UniqueConstraint("id", "asset_id", "organisation_id", name="uq_asset_version_composite_ptr"),
         ForeignKeyConstraint(
             ["asset_id", "organisation_id"],
             ["assets.id", "assets.organisation_id"],

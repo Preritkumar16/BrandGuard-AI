@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import date, datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Date, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, UniqueConstraint, func
+from sqlalchemy import String, Integer, Date, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, UniqueConstraint, and_, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -65,31 +65,37 @@ class SourceVersion(Base):
     )
 
     # Relationships
-    organisation: Mapped["Organisation"] = relationship("Organisation")
+    organisation: Mapped["Organisation"] = relationship("Organisation", overlaps="brand_source,creator,approver,chunks")
     brand_source: Mapped["BrandSource"] = relationship(
         "BrandSource",
         back_populates="versions",
-        foreign_keys=[source_id],
+        primaryjoin="and_(SourceVersion.source_id == BrandSource.id, SourceVersion.organisation_id == BrandSource.organisation_id)",
+        foreign_keys=[source_id, organisation_id],
+        overlaps="organisation,versions",
     )
     creator: Mapped["User"] = relationship(
         "User",
         primaryjoin="and_(SourceVersion.created_by == User.id, SourceVersion.organisation_id == User.organisation_id)",
         foreign_keys=[created_by, organisation_id],
+        overlaps="organisation,brand_source",
     )
     approver: Mapped[Optional["User"]] = relationship(
         "User",
         primaryjoin="and_(SourceVersion.approved_by == User.id, SourceVersion.organisation_id == User.organisation_id)",
         foreign_keys=[approved_by, organisation_id],
+        overlaps="organisation,brand_source,creator",
     )
     chunks: Mapped[List["SourceChunk"]] = relationship(
         "SourceChunk",
         back_populates="source_version",
         cascade="all, delete-orphan",
+        overlaps="organisation",
     )
 
     __table_args__ = (
         UniqueConstraint("source_id", "version_number", name="uq_source_version_number"),
         UniqueConstraint("id", "organisation_id", name="uq_source_version_id_organisation"),
+        UniqueConstraint("id", "source_id", "organisation_id", name="uq_source_version_composite_ptr"),
         ForeignKeyConstraint(
             ["source_id", "organisation_id"],
             ["brand_sources.id", "brand_sources.organisation_id"],
@@ -106,6 +112,6 @@ class SourceVersion(Base):
             ["approved_by", "organisation_id"],
             ["users.id", "users.organisation_id"],
             name="fk_source_version_approver_tenant",
-            ondelete="SET NULL",
+            ondelete="RESTRICT",
         ),
     )

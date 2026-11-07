@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey, ForeignKeyConstraint, UniqueConstraint, func
+from sqlalchemy import String, DateTime, ForeignKey, ForeignKeyConstraint, UniqueConstraint, and_, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -31,12 +31,6 @@ class Asset(Base):
     )
     current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey(
-            "asset_versions.id",
-            ondelete="SET NULL",
-            use_alter=True,
-            name="fk_assets_current_version_id",
-        ),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -51,11 +45,17 @@ class Asset(Base):
 
     # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
+    creator: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[created_by],
+        overlaps="organisation",
+    )
     current_version: Mapped[Optional["AssetVersion"]] = relationship(
         "AssetVersion",
+        primaryjoin="and_(Asset.current_version_id == AssetVersion.id, Asset.id == AssetVersion.asset_id, Asset.organisation_id == AssetVersion.organisation_id)",
         foreign_keys=[current_version_id],
         post_update=True,
+        overlaps="versions",
     )
     versions: Mapped[List["AssetVersion"]] = relationship(
         "AssetVersion",
@@ -71,5 +71,12 @@ class Asset(Base):
             ["users.id", "users.organisation_id"],
             name="fk_asset_creator_tenant",
             ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["current_version_id", "id", "organisation_id"],
+            ["asset_versions.id", "asset_versions.asset_id", "asset_versions.organisation_id"],
+            name="fk_assets_current_version_parent_tenant",
+            ondelete="RESTRICT",
+            use_alter=True,
         ),
     )
