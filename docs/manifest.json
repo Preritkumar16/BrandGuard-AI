@@ -1,0 +1,29 @@
+{
+  "project": "BrandGuard AI",
+  "stage": "Inkloom AI Hackathon \u2014 Round 2: The Build",
+  "documentation_version": "1.0",
+  "freeze_date": "2026-11-05",
+  "status": "FROZEN \u2014 baseline specification",
+  "freeze_scope": "Product requirements, MVP scope, architecture, data model, API contracts, AI audit pipeline, security principles, build plan, setup, testing and operational guidance.",
+  "not_frozen": "Implementation status, exact provider/model versions, deployment configuration, organiser-specific submission requirements, and any details that must be verified against the actual code or event instructions.",
+  "documents": [
+    "PRD.md",
+    "Design.md",
+    "Architecture.md",
+    "Database.md",
+    "API.md",
+    "Agents.md",
+    "README.md",
+    "Plan.md",
+    "Setup.md",
+    "Features.md",
+    "Authentication and security.md",
+    "MCP Connection.md",
+    "Integrations.md",
+    "Testing.md",
+    "Debugging.md",
+    "FREEZE_RECORD.md"
+  ],
+  "change_control": "Do not silently alter frozen requirements or API/data contracts. Record approved amendments in FREEZE_RECORD.md and update all affected documents together.",
+  "important": "PLANNED means not implemented. Do not claim a feature is implemented or tested without code and recorded test evidence."
+}
