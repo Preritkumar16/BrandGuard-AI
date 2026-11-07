@@ -32,6 +32,5 @@ class EvidenceLink(Base):
     passage_id: Mapped[str] = mapped_column(String(255), nullable=False)
     locator: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
-    # Relationships
     finding: Mapped["Finding"] = relationship("Finding", back_populates="evidence_links")
     source_version: Mapped["SourceVersion"] = relationship("SourceVersion")

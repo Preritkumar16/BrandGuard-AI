@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey, Index, func
+from sqlalchemy import String, DateTime, ForeignKey, ForeignKeyConstraint, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -26,16 +26,10 @@ class Dependency(Base):
         index=True,
     )
     asset_version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("asset_versions.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        UUID(as_uuid=True), nullable=False, index=True
     )
     source_version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("source_versions.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        UUID(as_uuid=True), nullable=False, index=True
     )
     dependency_status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="ACTIVE"
@@ -50,10 +44,19 @@ class Dependency(Base):
         nullable=False,
     )
 
-    # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    asset_version: Mapped["AssetVersion"] = relationship("AssetVersion")
-    source_version: Mapped["SourceVersion"] = relationship("SourceVersion")
+    asset_version: Mapped["AssetVersion"] = relationship(
+        "AssetVersion",
+        primaryjoin="and_(Dependency.asset_version_id == AssetVersion.id, Dependency.organisation_id == AssetVersion.organisation_id)",
+        foreign_keys=[asset_version_id, organisation_id],
+        overlaps="organisation",
+    )
+    source_version: Mapped["SourceVersion"] = relationship(
+        "SourceVersion",
+        primaryjoin="and_(Dependency.source_version_id == SourceVersion.id, Dependency.organisation_id == SourceVersion.organisation_id)",
+        foreign_keys=[source_version_id, organisation_id],
+        overlaps="asset_version,organisation",
+    )
 
     __table_args__ = (
         Index(
@@ -61,5 +64,17 @@ class Dependency(Base):
             "organisation_id",
             "asset_version_id",
             "source_version_id",
+        ),
+        ForeignKeyConstraint(
+            ["asset_version_id", "organisation_id"],
+            ["asset_versions.id", "asset_versions.organisation_id"],
+            name="fk_dependency_asset_version_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["source_version_id", "organisation_id"],
+            ["source_versions.id", "source_versions.organisation_id"],
+            name="fk_dependency_source_version_tenant",
+            ondelete="CASCADE",
         ),
     )

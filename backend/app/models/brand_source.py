@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey, func
+from sqlalchemy import String, DateTime, ForeignKey, ForeignKeyConstraint, UniqueConstraint, and_, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -27,14 +27,15 @@ class BrandSource(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     source_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    owner_user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("source_versions.id", ondelete="SET NULL", use_alter=True, name="fk_brand_sources_current_version_id"),
+        ForeignKey(
+            "source_versions.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_brand_sources_current_version_id",
+        ),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -47,17 +48,29 @@ class BrandSource(Base):
         nullable=False,
     )
 
-    # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    owner: Mapped["User"] = relationship("User", foreign_keys=[owner_user_id])
+    owner: Mapped["User"] = relationship(
+        "User",
+        primaryjoin="and_(BrandSource.owner_user_id == User.id, BrandSource.organisation_id == User.organisation_id)",
+        foreign_keys=[owner_user_id, organisation_id],
+        overlaps="organisation",
+    )
     current_version: Mapped[Optional["SourceVersion"]] = relationship(
-        "SourceVersion",
-        foreign_keys=[current_version_id],
-        post_update=True,
+        "SourceVersion", foreign_keys=[current_version_id], post_update=True
     )
     versions: Mapped[List["SourceVersion"]] = relationship(
         "SourceVersion",
         back_populates="brand_source",
         foreign_keys="SourceVersion.source_id",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("id", "organisation_id", name="uq_brand_source_id_organisation"),
+        ForeignKeyConstraint(
+            ["owner_user_id", "organisation_id"],
+            ["users.id", "users.organisation_id"],
+            name="fk_brand_source_owner_tenant",
+            ondelete="RESTRICT",
+        ),
     )

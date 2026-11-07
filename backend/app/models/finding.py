@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, ForeignKey, func
+from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, CheckConstraint, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -36,10 +36,7 @@ class Finding(Base):
         index=True,
     )
     asset_version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("asset_versions.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        UUID(as_uuid=True), nullable=False, index=True
     )
     category: Mapped[FindingCategory] = mapped_column(
         SQLEnum(FindingCategory, native_enum=False, values_callable=lambda x: [e.value for e in x]),
@@ -70,4 +67,15 @@ class Finding(Base):
     asset_version: Mapped["AssetVersion"] = relationship("AssetVersion")
     evidence_links: Mapped[List["EvidenceLink"]] = relationship(
         "EvidenceLink", back_populates="finding", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("span_start >= 0 AND span_end > span_start", name="ck_finding_span_offsets"),
+        UniqueConstraint("id", "organisation_id", name="uq_finding_id_organisation"),
+        ForeignKeyConstraint(
+            ["asset_version_id", "organisation_id"],
+            ["asset_versions.id", "asset_versions.organisation_id"],
+            name="fk_finding_asset_version_tenant",
+            ondelete="CASCADE",
+        ),
     )

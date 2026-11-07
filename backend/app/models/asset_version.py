@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Text, DateTime, Enum as SQLEnum, ForeignKey, UniqueConstraint, func
+from sqlalchemy import String, Integer, Text, DateTime, Enum as SQLEnum, ForeignKey, ForeignKeyConstraint, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -35,10 +35,7 @@ class AssetVersion(Base):
         index=True,
     )
     asset_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("assets.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+        UUID(as_uuid=True), nullable=False, index=True
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -50,9 +47,7 @@ class AssetVersion(Base):
         default=AssetVersionStatus.DRAFT,
     )
     created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        UUID(as_uuid=True), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -73,4 +68,17 @@ class AssetVersion(Base):
 
     __table_args__ = (
         UniqueConstraint("asset_id", "version_number", name="uq_asset_version_number"),
+        UniqueConstraint("id", "organisation_id", name="uq_asset_version_id_organisation"),
+        ForeignKeyConstraint(
+            ["asset_id", "organisation_id"],
+            ["assets.id", "assets.organisation_id"],
+            name="fk_asset_version_asset_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["created_by", "organisation_id"],
+            ["users.id", "users.organisation_id"],
+            name="fk_asset_version_creator_tenant",
+            ondelete="RESTRICT",
+        ),
     )

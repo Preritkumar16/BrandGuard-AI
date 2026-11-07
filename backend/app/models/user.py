@@ -1,6 +1,6 @@
 import uuid
 import enum
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING
 from sqlalchemy import String, DateTime, Boolean, Enum as SQLEnum, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -11,12 +11,14 @@ from app.database.base import Base
 if TYPE_CHECKING:
     from app.models.organisation import Organisation
 
+
 class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     SOURCE_OWNER = "SOURCE_OWNER"
     CREATOR = "CREATOR"
     REVIEWER = "REVIEWER"
     COMPLIANCE_REVIEWER = "COMPLIANCE_REVIEWER"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -74,4 +76,5 @@ class User(Base):
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "email", name="uq_user_organisation_email"),
+        UniqueConstraint("id", "organisation_id", name="uq_user_id_organisation"),
     )

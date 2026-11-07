@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey, func
+from sqlalchemy import String, DateTime, ForeignKey, ForeignKeyConstraint, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -27,9 +27,7 @@ class Asset(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        UUID(as_uuid=True), nullable=False
     )
     current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
@@ -64,4 +62,14 @@ class Asset(Base):
         back_populates="asset",
         foreign_keys="AssetVersion.asset_id",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("id", "organisation_id", name="uq_asset_id_organisation"),
+        ForeignKeyConstraint(
+            ["created_by", "organisation_id"],
+            ["users.id", "users.organisation_id"],
+            name="fk_asset_creator_tenant",
+            ondelete="RESTRICT",
+        ),
     )

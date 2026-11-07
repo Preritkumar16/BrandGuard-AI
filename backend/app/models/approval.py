@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, DateTime, ForeignKey, ForeignKeyConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -26,15 +26,10 @@ class Approval(Base):
         index=True,
     )
     asset_version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("asset_versions.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        UUID(as_uuid=True), nullable=False, unique=True
     )
     reviewer_user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        UUID(as_uuid=True), nullable=False
     )
     decision: Mapped[str] = mapped_column(String(50), nullable=False)
     source_set_digest: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -45,7 +40,31 @@ class Approval(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    # Relationships
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    asset_version: Mapped["AssetVersion"] = relationship("AssetVersion")
-    reviewer: Mapped["User"] = relationship("User", foreign_keys=[reviewer_user_id])
+    asset_version: Mapped["AssetVersion"] = relationship(
+        "AssetVersion",
+        primaryjoin="and_(Approval.asset_version_id == AssetVersion.id, Approval.organisation_id == AssetVersion.organisation_id)",
+        foreign_keys=[asset_version_id, organisation_id],
+        overlaps="organisation",
+    )
+    reviewer: Mapped["User"] = relationship(
+        "User",
+        primaryjoin="and_(Approval.reviewer_user_id == User.id, Approval.organisation_id == User.organisation_id)",
+        foreign_keys=[reviewer_user_id, organisation_id],
+        overlaps="asset_version,organisation",
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["asset_version_id", "organisation_id"],
+            ["asset_versions.id", "asset_versions.organisation_id"],
+            name="fk_approval_asset_version_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["reviewer_user_id", "organisation_id"],
+            ["users.id", "users.organisation_id"],
+            name="fk_approval_reviewer_tenant",
+            ondelete="RESTRICT",
+        ),
+    )
