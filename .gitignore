@@ -1,33 +1,57 @@
-
 # Environment variables and secrets
 .env
 .env.*
 !.env.example
+!.env.*.example
 
-# Python
+# Python / FastAPI
 __pycache__/
 *.py[cod]
+*.pyo
 .venv/
 venv/
+ENV/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
+*.egg-info/
 
-# Node
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js / React / Next.js / Vite
 node_modules/
 .next/
 dist/
 build/
 coverage/
+*.tsbuildinfo
+.npm/
 
-# IDE
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Uploads and generated files
+uploads/
+*.tmp
+
+# IDE and editor
 .vscode/*
 !.vscode/extensions.json
 .idea/
+*.swp
+*.swo
 
 # Operating system
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
+Desktop.ini
+/backend/storage/
