@@ -11,7 +11,9 @@ from app.models.brand_source import BrandSource
 from app.models.source_version import SourceVersion, SourceStatus
 from app.schemas.brand_source import BrandSourceResponse
 from app.api.deps import get_current_user
+from app.services.qdrant_service import index_source_version
 from pypdf import PdfReader
+from docx import Document
 
 router = APIRouter(prefix="/sources", tags=["Brand Sources"])
 
@@ -41,7 +43,7 @@ async def create_brand_source(
     with open(file_location, "wb+") as file_object:
         file_object.write(file_content)
 
-    # 3. Compute content hash & extract text
+    # 3. Compute content hash & extract text based on format
     content_hash = hashlib.sha256(file_content).hexdigest()
     
     extracted_text = ""
@@ -54,6 +56,12 @@ async def create_brand_source(
                     extracted_text += text + "\n"
         except Exception:
             extracted_text = "Failed to parse PDF text."
+    elif file.filename.endswith(".docx"):
+        try:
+            doc = Document(file_location)
+            extracted_text = "\n".join([para.text for para in doc.paragraphs if para.text])
+        except Exception:
+            extracted_text = "Failed to parse DOCX text."
     else:
         try:
             extracted_text = file_content.decode("utf-8", errors="ignore")
@@ -123,3 +131,40 @@ async def list_brand_sources(
         )
         for s in sources
     ]
+
+@router.post("/{source_id}/versions/{version_id}/approve", response_model=dict)
+async def approve_brand_source_version(
+    source_id: str,
+    version_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SourceVersion).filter(
+            SourceVersion.id == version_id,
+            SourceVersion.source_id == source_id,
+            SourceVersion.organisation_id == current_user.organisation_id
+        )
+    )
+    version = result.scalars().first()
+    if not version:
+        raise HTTPException(status_code=404, detail="Source version not found.")
+
+    # Prevent self-approval (four-eyes principle)
+    if version.created_by == current_user.id:
+        raise HTTPException(status_code=403, detail="Author cannot approve their own brand source version.")
+
+    version.status = SourceStatus.APPROVED
+    version.approved_by = current_user.id
+
+    # Index chunks into Qdrant only upon official approval
+    if version.extracted_text_ref:
+        index_source_version(
+            organisation_id=str(current_user.organisation_id),
+            source_version_id=str(version.id),
+            extracted_text=version.extracted_text_ref
+        )
+
+    await db.commit()
+
+    return {"message": f"Source version {version.version_number} approved and indexed successfully."}
