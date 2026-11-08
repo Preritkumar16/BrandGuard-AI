@@ -13,7 +13,7 @@ import { Modal } from '../UI/Modal';
 import { Input, Textarea } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { NewSourceModal } from './NewSourceModal';
-import { sourcesService } from '../../services/api/sourcesService';
+import { sourcesService } from '../../services/API/sourcesService';
 
 interface SourcesViewProps {
   sources: BrandSource[];

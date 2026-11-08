@@ -30,9 +30,9 @@ import { InspectionDiffBox } from '../audit/InspectionDiffBox';
 import { AuditFindingsList } from '../audit/AuditFindingsList';
 import { EvidenceDrawer } from '../audit/EvidenceDrawer';
 import { DecisionModal } from '../reviews/DecisionModal';
-import { auditService } from '../../services/api/auditService';
-import { assetsService } from '../../services/api/assetsService';
-import { reviewsService } from '../../services/api/reviewsService';
+import { auditService } from '../../services/API/auditService';
+import { assetsService } from '../../services/API/assetsService';
+import { reviewsService } from '../../services/API/reviewsService';
 
 interface AssetDetailViewProps {
   assetId: string;

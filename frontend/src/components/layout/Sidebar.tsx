@@ -21,7 +21,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { User } from '../../types';
-import { authService } from '../../services/api/authService';
+import { authService } from '../../services/API/authService';
 
 export type NavTab = 'dashboard' | 'governance-hub' | 'queue' | 'assets' | 'sources' | 'asset-detail' | 'audit-log' | 'settings';
 

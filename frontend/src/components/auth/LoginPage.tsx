@@ -17,7 +17,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../../types';
-import { authService, ROLE_DEFINITIONS } from '../../services/api/authService';
+import { authService, ROLE_DEFINITIONS } from '../../services/API/authService';
 import { Button } from '../UI/Button';
 import { Input } from '../UI/Input';
 import { Select } from '../UI/Select';
