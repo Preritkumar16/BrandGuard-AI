@@ -54,3 +54,4 @@ uploads/
 .DS_Store
 Thumbs.db
 Desktop.ini
+/backend/storage/
