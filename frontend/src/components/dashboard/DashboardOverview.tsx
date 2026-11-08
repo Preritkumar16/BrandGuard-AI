@@ -20,9 +20,9 @@ import {
   Shield,
 } from 'lucide-react';
 import { Asset, BrandSource, ReviewQueueItem, User } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card, CardBody, CardHeader } from '../ui/Card';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
+import { Card, CardBody, CardHeader } from '../UI/Card';
 
 interface DashboardOverviewProps {
   assets: Asset[];

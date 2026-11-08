@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../../types';
 import { authService, ROLE_DEFINITIONS } from '../../services/api/authService';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { Badge } from '../ui/Badge';
+import { Button } from '../UI/Button';
+import { Input } from '../UI/Input';
+import { Select } from '../UI/Select';
+import { Badge } from '../UI/Badge';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserType) => void;

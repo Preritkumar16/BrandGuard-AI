@@ -6,8 +6,8 @@
 import React from 'react';
 import { BookOpen, CheckCircle, ExternalLink, ShieldAlert, X } from 'lucide-react';
 import { EvidenceReference, FindingSeverity } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 
 interface EvidenceDrawerProps {
   evidence: EvidenceReference | null;

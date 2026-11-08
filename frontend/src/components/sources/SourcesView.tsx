@@ -6,12 +6,12 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, ShieldCheck, ChevronRight, CheckCircle2, Copy, Check, Search, Filter, X } from 'lucide-react';
 import { BrandSource, BrandSourcePassage, User } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card, CardBody, CardHeader } from '../ui/Card';
-import { Modal } from '../ui/Modal';
-import { Input, Textarea } from '../ui/Input';
-import { Select } from '../ui/Select';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
+import { Card, CardBody, CardHeader } from '../UI/Card';
+import { Modal } from '../UI/Modal';
+import { Input, Textarea } from '../UI/Input';
+import { Select } from '../UI/Select';
 import { NewSourceModal } from './NewSourceModal';
 import { sourcesService } from '../../services/api/sourcesService';
 

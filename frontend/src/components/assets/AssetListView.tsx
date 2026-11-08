@@ -6,10 +6,10 @@
 import React, { useState } from 'react';
 import { Search, Filter, Plus, ArrowRight, Layers, FileText, X } from 'lucide-react';
 import { Asset, ComplianceStatus } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
-import { Select } from '../ui/Select';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
+import { Card } from '../UI/Card';
+import { Select } from '../UI/Select';
 
 interface AssetListViewProps {
   assets: Asset[];

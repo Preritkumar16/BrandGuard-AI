@@ -5,11 +5,11 @@
 
 import React, { useState } from 'react';
 import { Sliders, Shield, Save, Check, Bell, Lock, RefreshCw, AlertTriangle, ShieldAlert } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Card, CardBody, CardHeader } from '../ui/Card';
-import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { Badge } from '../ui/Badge';
+import { Button } from '../UI/Button';
+import { Card, CardBody, CardHeader } from '../UI/Card';
+import { Input } from '../UI/Input';
+import { Select } from '../UI/Select';
+import { Badge } from '../UI/Badge';
 import { User } from '../../types';
 
 interface SettingsViewProps {

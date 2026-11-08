@@ -6,9 +6,9 @@
 import React, { useState } from 'react';
 import { History, ShieldCheck, Play, ArrowRight, User as UserIcon, Filter, Clock } from 'lucide-react';
 import { Asset, User } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
-import { Select } from '../ui/Select';
+import { Badge } from '../UI/Badge';
+import { Card } from '../UI/Card';
+import { Select } from '../UI/Select';
 
 interface AuditLogViewProps {
   assets: Asset[];

@@ -6,10 +6,10 @@
 import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle, ShieldX, UserX, ShieldAlert } from 'lucide-react';
 import { AssetVersion, User } from '../../types';
-import { Modal } from '../ui/Modal';
-import { Button } from '../ui/Button';
-import { Textarea } from '../ui/Input';
-import { Badge } from '../ui/Badge';
+import { Modal } from '../UI/Modal';
+import { Button } from '../UI/Button';
+import { Textarea } from '../UI/Input';
+import { Badge } from '../UI/Badge';
 
 interface DecisionModalProps {
   isOpen: boolean;
