@@ -86,4 +86,5 @@ export const Badge: React.FC<BadgeProps> = ({
       <span>{label}</span>
     </span>
   );
+  
 };
