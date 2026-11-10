@@ -155,7 +155,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <span className="text-[10px] uppercase font-mono tracking-wider text-[#64748B] block">
                 Quick Role-Based Demo Sign-In (Select Persona):
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {availableUsers.map(user => {
                   return (
                     <button
@@ -168,17 +168,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                         <span className="text-xs font-bold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors truncate">
                           {user.name.split(' ')[0]}
                         </span>
-                        <Badge
-                          variant={
-                            user.role === 'admin'
-                              ? 'info'
-                              : user.role === 'reviewer'
-                              ? 'compliant'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {user.role}
+                        <Badge variant="info" size="sm">
+                          {user.role.replaceAll('_', ' ')}
                         </Badge>
                       </div>
                       <div className="text-[10px] text-[#94A3B8] truncate leading-tight">
@@ -261,9 +252,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   <Select
                     label="Assigned Governance Role (RBAC)"
                     options={[
-                      { value: 'creator', label: 'Creator (Draft & Submit Only)' },
-                      { value: 'reviewer', label: 'Reviewer (Governance Sign-off)' },
-                      { value: 'admin', label: 'Admin (Full Policy Authority)' },
+                      { value: 'creator', label: 'Creator' },
+                      { value: 'source_owner', label: 'Source Owner' },
+                      { value: 'reviewer', label: 'Reviewer / Approver' },
+                      { value: 'compliance_reviewer', label: 'Compliance Reviewer' },
+                      { value: 'admin', label: 'Organisation Admin' },
                     ]}
                     value={selectedRole}
                     onChange={e => setSelectedRole(e.target.value as UserRole)}

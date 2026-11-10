@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Sidebar, NavTab } from './components/layout/Sidebar';
+import { Sidebar } from './components/layout/Sidebar';
 import { Header, BreadcrumbItem } from './components/layout/Header';
 import { DashboardOverview } from './components/dashboard/DashboardOverview';
 import { AssetListView } from './components/assets/AssetListView';
@@ -23,14 +23,60 @@ import { ComplianceHealthModal } from './components/common/ComplianceHealthModal
 import { PolicyRulesModal } from './components/common/PolicyRulesModal';
 import { Modal } from './components/ui/Modal';
 import { Input } from './components/ui/Input';
-import { Asset, BrandSource, ReviewQueueItem, User } from './types';
+import { Asset, BrandSource, ReviewQueueItem, User, UserRole } from './types';
 import { authService } from './services/API/authService';
 import { assetsService } from './services/API/assetsService';
 import { sourcesService } from './services/API/sourcesService';
 import { reviewsService } from './services/API/reviewsService';
 import { auditService } from './services/API/auditService';
-import { performGlobalSearch, SearchResultItem } from './services/API/searchService';
-import { Search, FileText, BookOpen, AlertCircle, ArrowRight, ShieldCheck, Tag } from 'lucide-react';
+import { performGlobalSearch } from './services/API/searchService';
+import { Search, FileText, BookOpen, AlertCircle } from 'lucide-react';
+import { AppScreen, navigationFor } from './config/navigation';
+
+
+// Tabs used by the main application content.
+type NavTab =
+  | 'dashboard'
+  | 'governance-hub'
+  | 'queue'
+  | 'assets'
+  | 'sources'
+  | 'asset-detail'
+  | 'audit-log'
+  | 'settings';
+
+// Maps Sidebar screen identifiers to the tabs rendered by App.
+const SCREEN_TO_TAB: Partial<Record<AppScreen, NavTab>> = {
+  dashboard: 'dashboard',
+   assets: 'assets',
+  sources: 'sources',
+  queue: 'queue',
+  settings: 'settings',
+  activity: 'audit-log',
+  'asset-workspace': 'asset-detail',
+  findings: 'queue',
+  reports: 'audit-log',
+  'source-upload': 'sources',
+  'source-detail': 'sources',
+  'source-history': 'sources',
+  feedback: 'queue',
+};
+
+// Keeps the Sidebar's selected screen in sync with the active App tab.
+function getScreenForTab(tab: NavTab): AppScreen {
+  switch (tab) {
+    case 'asset-detail':
+      return 'asset-workspace';
+    case 'audit-log':
+      return 'activity';
+    case 'governance-hub':
+    case 'sources':
+      return 'sources';
+    default:
+      return tab;
+  }
+}
+
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authService.isAuthenticated());
@@ -39,6 +85,7 @@ export default function App() {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [sourcesCategoryFilter, setSourcesCategoryFilter] = useState<string>('all');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   // User state (RBAC session)
   const [currentUser, setCurrentUser] = useState<User>(authService.getCurrentUserSync());
@@ -204,21 +251,34 @@ export default function App() {
     <div className="min-h-screen bg-[#0B0F19] text-[#F8FAFC]">
       {/* Sidebar Navigation Rail */}
       <Sidebar
-        currentTab={currentTab}
-        onSelectTab={tab => {
-          setCurrentTab(tab);
-          if (tab === 'assets') {
+        items={navigationFor(currentUser.role as UserRole).filter(item =>
+          Boolean(SCREEN_TO_TAB[item.id])
+        )}
+        currentScreen={getScreenForTab(currentTab)}
+        onSelectScreen={(screen: AppScreen) => {
+          const nextTab = SCREEN_TO_TAB[screen];
+          
+          if (!nextTab) return;
+          
+          setCurrentTab(nextTab);
+          setMobileSidebarOpen(false);
+
+          if (nextTab === 'assets') {
             refreshAllData();
           }
         }}
-        queueCount={queue.length}
         currentUser={currentUser}
-        onUserChanged={u => setCurrentUser(u)}
+        onUserChanged={user => setCurrentUser(user)}
         collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onOpenRbacModal={() => setRbacModalOpen(true)}
+        onToggleCollapse={() =>
+          setSidebarCollapsed(previous => !previous)
+        }
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
         onLogout={handleLogout}
-      />
+        roleSupported={true}
+/>
+
 
       {/* Persistent Header */}
       <Header

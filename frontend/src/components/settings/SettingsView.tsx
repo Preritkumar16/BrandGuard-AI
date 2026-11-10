@@ -11,6 +11,7 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Badge } from '../ui/Badge';
 import { User } from '../../types';
+import { can } from '../../config/permissions';
 
 interface SettingsViewProps {
   currentUser?: User;
@@ -23,7 +24,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
   const [requireDisclaimerFootnotes, setRequireDisclaimerFootnotes] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser ? can(currentUser, 'manage_settings').allowed : false;
 
   const handleSave = () => {
     if (!isAdmin) return;
@@ -59,7 +60,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
           leftIcon={savedSuccess ? <Check className="w-3.5 h-3.5 text-[#10B981]" /> : <Save className="w-3.5 h-3.5" />}
           onClick={handleSave}
         >
-          {savedSuccess ? 'Settings Saved' : 'Save Configuration'}
+          {savedSuccess ? 'Held in this session' : 'Save Configuration'}
         </Button>
       </div>
 
@@ -74,7 +75,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
             <p className="text-[#F8FAFC]/90 leading-relaxed">
               You are signed in as <strong>{currentUser?.name}</strong> with role{' '}
               <span className="font-semibold uppercase text-[#F59E0B]">{currentUser?.role}</span>.
-              Only users with the <strong>Admin</strong> role (e.g. Elena Rostova) are authorized to modify global governance parameters, SLA thresholds, and engine strictness. You may view these settings in read-only mode.
+              Only an organisation admin can change these controls in the interface. You can read them. Saving does not call a backend settings endpoint.
             </p>
           </div>
         </div>
@@ -83,7 +84,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-center gap-2">
           <Check className="w-4 h-4 shrink-0" />
-          <span>Governance policy thresholds have been updated and synced to the active policy engine.</span>
+          <span>These values stay in this browser session. No settings endpoint is connected, so nothing was written to the backend.</span>
         </div>
       )}
 

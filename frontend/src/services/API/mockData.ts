@@ -30,6 +30,22 @@ export const MOCK_USERS: User[] = [
     title: 'VP of Global Brand Operations',
     avatar: 'ER',
   },
+  {
+    id: 'user-source-owner',
+    name: 'David Kim',
+    email: 'david.kim@brandguard.internal',
+    role: 'source_owner',
+    title: 'Brand Custodian',
+    avatar: 'DK',
+  },
+  {
+    id: 'user-compliance',
+    name: 'Priya Shah',
+    email: 'priya.shah@brandguard.internal',
+    role: 'compliance_reviewer',
+    title: 'Compliance Reviewer',
+    avatar: 'PS',
+  },
 ];
 
 export const MOCK_SOURCES: BrandSource[] = [

@@ -14,6 +14,7 @@ import { Input, Textarea } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { NewSourceModal } from './NewSourceModal';
 import { sourcesService } from '../../services/api/sourcesService';
+import { can } from '../../config/permissions';
 
 interface SourcesViewProps {
   sources: BrandSource[];
@@ -123,15 +124,15 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {currentUser?.role === 'creator' && (
+          {currentUser && !can(currentUser, 'upload_source').allowed && (
             <span className="text-[11px] text-[#F59E0B] font-mono hidden md:inline">
-              Reviewer / Admin role required to add guidelines
+              Source upload is limited to source owners and organisation admins
             </span>
           )}
           <Button
             variant="primary"
             size="sm"
-            disabled={currentUser?.role === 'creator'}
+            disabled={!currentUser || !can(currentUser, 'upload_source').allowed}
             leftIcon={<Plus className="w-3.5 h-3.5" />}
             onClick={() => setNewSourceModalOpen(true)}
           >

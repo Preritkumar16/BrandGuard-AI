@@ -3,9 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type UserRole = 'creator' | 'reviewer' | 'admin';
+export type UserRole =
+  | 'admin'
+  | 'source_owner'
+  | 'creator'
+  | 'reviewer'
+  | 'compliance_reviewer';
 
-export type PermissionAction = 
+export type PermissionAction =
   | 'submit_asset'
   | 'draft_revision'
   | 'run_audit'
@@ -13,7 +18,15 @@ export type PermissionAction =
   | 'approve_asset'
   | 'manage_sources'
   | 'manage_settings'
-  | 'view_audit_log';
+  | 'view_audit_log'
+  | 'view_users'
+  | 'manage_users'
+  | 'view_sources'
+  | 'upload_source'
+  | 'view_compliance'
+  | 'export_report'
+  | 'view_assets'
+  | 'view_queue';
 
 export interface RolePermissions {
   role: UserRole;
