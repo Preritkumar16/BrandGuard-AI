@@ -20,6 +20,21 @@ FindingSeverity = Literal[
     "CRITICAL",
 ]
 
+SemanticAssessment = Literal[
+    "SUPPORTS_CLAIM",
+    "CONTRADICTS_CLAIM",
+    "INSUFFICIENT",
+    "AMBIGUOUS",
+]
+
+class SemanticEvidenceAssessment(BaseModel):
+    """Structured result of semantic evidence verification."""
+
+    assessment: SemanticAssessment
+    explanation: StrictStr = Field(min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
 
 class AuditSpan(BaseModel):
     """Exact location of a finding within the submitted asset."""

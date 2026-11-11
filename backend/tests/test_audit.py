@@ -14,6 +14,28 @@ from app.services.audit_service import _determine_compliance_status
 def make_groq_mock():
     async def fake_create(**kwargs):
         prompt = kwargs["messages"][1]["content"]
+
+        # Second-stage semantic verification
+        if "SEMANTIC EVIDENCE VERIFICATION" in prompt:
+            semantic_result = {
+                "assessment": "SUPPORTS_CLAIM",
+                "explanation": (
+                    "The cited guideline explicitly requires Navy Blue "
+                    "#000080 for headers, matching the submitted claim."
+                ),
+            }
+
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=json.dumps(semantic_result)
+                        )
+                    )
+                ]
+            )
+
+        # First-stage audit finding generation
         source_match = re.search(
             r"\[Source Version ID: ([^\]]+)\]",
             prompt,
@@ -24,14 +46,13 @@ def make_groq_mock():
         )
         assert source_match, "Source version ID missing from prompt"
         assert passage_match, "Passage ID missing from prompt"
-        
+
         source_version_id = source_match.group(1)
         passage_id = passage_match.group(1)
 
         asset = "We love our official Navy Blue #000080 branding!"
         span_text = "official Navy Blue #000080"
         start = asset.index(span_text)
-        
         ai_result = {
             "summary": "The branding claim matches the approved guideline.",
             "findings": [
@@ -68,9 +89,7 @@ def make_groq_mock():
                 )
             ]
         )
-
     return fake_create
-
 
 @pytest.mark.asyncio
 async def test_end_to_end_compliance_audit_workflow(monkeypatch):
@@ -211,3 +230,213 @@ def test_compliance_status_classification(
     )
 
     assert result == expected
+
+def make_semantic_test_client(
+    category="SUPPORTED",
+    assessment="SUPPORTS_CLAIM",
+    semantic_failure=None,
+):
+    """Create a mock Groq client for focused semantic verification tests."""
+
+    async def fake_create(**kwargs):
+        prompt = kwargs["messages"][1]["content"]
+
+        # Second-stage semantic verification
+        if "SEMANTIC EVIDENCE VERIFICATION" in prompt:
+
+            if semantic_failure == "exception":
+                raise RuntimeError("Simulated semantic API failure")
+
+            if semantic_failure == "malformed":
+                content = json.dumps({
+                    "assessment": "INVALID_ASSESSMENT",
+                    "explanation": "Invalid test response.",
+                })
+            else:
+                content = json.dumps({
+                    "assessment": assessment,
+                    "explanation": "Test semantic assessment.",
+                })
+
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=content)
+                    )
+                ]
+            )
+
+        # First-stage audit finding generation
+        source_match = re.search(
+            r"\[Source Version ID: ([^\]]+)\]",
+            prompt,
+        )
+        passage_match = re.search(
+            r"\[Passage ID: ([^\]]+)\]",
+            prompt,
+        )
+
+        assert source_match, "Source version ID missing from prompt"
+        assert passage_match, "Passage ID missing from prompt"
+
+        asset = "Our official Navy Blue #000080 branding!"
+        span_text = "official Navy Blue #000080"
+        start = asset.index(span_text)
+
+        ai_result = {
+            "summary": "Test audit summary.",
+            "findings": [
+                {
+                    "category": category,
+                    "severity": "LOW",
+                    "span": {
+                        "start": start,
+                        "end": start + len(span_text),
+                        "text": span_text,
+                    },
+                    "explanation": "Test finding explanation.",
+                    "evidence": [
+                        {
+                            "source_version_id": source_match.group(1),
+                            "passage_id": passage_match.group(1),
+                        }
+                    ],
+                    "suggested_action": "Review if required.",
+                    "suggested_replacement": None,
+                }
+            ],
+        }
+
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=json.dumps(ai_result)
+                    )
+                )
+            ]
+        )
+
+    return SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=AsyncMock(side_effect=fake_create)
+            )
+        )
+    )
+
+
+async def run_semantic_audit_test(
+    monkeypatch,
+    category="SUPPORTED",
+    assessment="SUPPORTS_CLAIM",
+    semantic_failure=None,
+):
+    from app.services import audit_service
+
+    source_version_id = uuid.uuid4()
+    passage_id = "test-passage-001"
+
+    retrieved_passage = {
+        "source_version_id": source_version_id,
+        "passage_id": passage_id,
+        "text": "Always use official Navy Blue #000080 for headers.",
+    }
+
+    mock_client = make_semantic_test_client(
+        category=category,
+        assessment=assessment,
+        semantic_failure=semantic_failure,
+    )
+
+    monkeypatch.setattr(
+        audit_service,
+        "search_and_validate_guidelines",
+        AsyncMock(return_value=[retrieved_passage]),
+    )
+
+    monkeypatch.setattr(
+        audit_service,
+        "groq_client",
+        mock_client,
+    )
+
+    result = await audit_service.evaluate_asset_compliance(
+        db=None,
+        organisation_id=str(uuid.uuid4()),
+        asset_content="Our official Navy Blue #000080 branding!",
+    )
+
+    return result
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("category", "assessment", "expected_status", "expected_finding_status"),
+    [
+        (
+            "SUPPORTED",
+            "INSUFFICIENT",
+            "REVIEW_REQUIRED",
+            "UNVERIFIED",
+        ),
+        (
+            "SUPPORTED",
+            "AMBIGUOUS",
+            "REVIEW_REQUIRED",
+            "UNVERIFIED",
+        ),
+        (
+            "SUPPORTED",
+            "CONTRADICTS_CLAIM",
+            "REVIEW_REQUIRED",
+            "UNVERIFIED",
+        ),
+        (
+            "CONTRADICTED",
+            "CONTRADICTS_CLAIM",
+            "NON_COMPLIANT",
+            "VERIFIED",
+        ),
+    ],
+)
+async def test_semantic_assessment_classification(
+    monkeypatch,
+    category,
+    assessment,
+    expected_status,
+    expected_finding_status,
+):
+    result = await run_semantic_audit_test(
+        monkeypatch,
+        category=category,
+        assessment=assessment,
+    )
+    assert result["status"] == expected_status
+    assert result["findings"][0]["validation_status"] == expected_finding_status
+    assert result["validation"]["spans_validated"] is True
+    assert result["validation"]["checks_completed"] is True
+    if expected_finding_status == "UNVERIFIED":
+        assert result["validation"]["citations_validated"] is False
+    else:
+        assert result["validation"]["citations_validated"] is True
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure_type",
+    ["exception", "malformed"],
+)
+async def test_semantic_verification_failure_requires_review(
+    monkeypatch,
+    failure_type,
+):
+    result = await run_semantic_audit_test(
+        monkeypatch,
+        category="SUPPORTED",
+        assessment="SUPPORTS_CLAIM",
+        semantic_failure=failure_type,
+    )
+    assert result["status"] == "REVIEW_REQUIRED"
+    assert result["findings"][0]["validation_status"] == "UNVERIFIED"
+    assert result["validation"]["spans_validated"] is True
+    assert result["validation"]["checks_completed"] is False
+    assert result["validation"]["citations_validated"] is False
