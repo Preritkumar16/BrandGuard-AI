@@ -1,5 +1,9 @@
 import uuid
 import pytest
+import json
+import re
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database.session import AsyncSessionLocal
@@ -7,8 +11,77 @@ from app.models.user import User
 from app.core.security import get_password_hash
 from app.services.audit_service import _determine_compliance_status
 
+def make_groq_mock():
+    async def fake_create(**kwargs):
+        prompt = kwargs["messages"][1]["content"]
+        source_match = re.search(
+            r"\[Source Version ID: ([^\]]+)\]",
+            prompt,
+        )
+        passage_match = re.search(
+            r"\[Passage ID: ([^\]]+)\]",
+            prompt,
+        )
+        assert source_match, "Source version ID missing from prompt"
+        assert passage_match, "Passage ID missing from prompt"
+        
+        source_version_id = source_match.group(1)
+        passage_id = passage_match.group(1)
+
+        asset = "We love our official Navy Blue #000080 branding!"
+        span_text = "official Navy Blue #000080"
+        start = asset.index(span_text)
+        
+        ai_result = {
+            "summary": "The branding claim matches the approved guideline.",
+            "findings": [
+                {
+                    "category": "SUPPORTED",
+                    "severity": "LOW",
+                    "span": {
+                        "start": start,
+                        "end": start + len(span_text),
+                        "text": span_text,
+                    },
+                    "explanation": (
+                        "The submitted Navy Blue color matches "
+                        "the approved brand guideline."
+                    ),
+                    "evidence": [
+                        {
+                            "source_version_id": source_version_id,
+                            "passage_id": passage_id,
+                        }
+                    ],
+                    "suggested_action": "No action required.",
+                    "suggested_replacement": None,
+                }
+            ],
+        }
+
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=json.dumps(ai_result)
+                    )
+                )
+            ]
+        )
+
+    return fake_create
+
+
 @pytest.mark.asyncio
-async def test_end_to_end_compliance_audit_workflow():
+async def test_end_to_end_compliance_audit_workflow(monkeypatch):
+    from app.services import audit_service
+    assert audit_service.groq_client is not None
+    monkeypatch.setattr(
+        audit_service.groq_client.chat.completions,
+        "create",
+        AsyncMock(side_effect=make_groq_mock()),
+    )
+
     unique_suffix = uuid.uuid4().hex[:6]
     org_name = f"Governance Corp {unique_suffix}"
     admin_email = f"admin_{unique_suffix}@governance.com"
@@ -101,6 +174,14 @@ async def test_end_to_end_compliance_audit_workflow():
         )
         assert audit_post.status_code == 200
         audit_data = audit_post.json()
+        
+        print("\n========== AUDIT DEBUG ==========")
+        print("Status:", audit_data.get("status"))
+        print("Summary:", audit_data.get("summary"))
+        print("Findings:", audit_data.get("findings"))
+        print("Validation:", audit_data.get("validation"))
+        print("=================================\n")
+
         assert audit_data["status"] == "COMPLIANT"
         assert audit_data["validation"]["checks_completed"] is True
         assert audit_data["validation"]["citations_validated"] is True
