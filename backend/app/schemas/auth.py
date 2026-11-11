@@ -1,20 +1,25 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from app.models.user import UserRole
 
+
 class UserRegister(BaseModel):
     organisation_name: str
     name: str
     email: EmailStr
     password: str
-    role: UserRole = UserRole.ADMIN
+
+    model_config = ConfigDict(extra="forbid")
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class UserResponse(BaseModel):
     id: str

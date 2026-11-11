@@ -5,6 +5,7 @@ from app.main import app
 from app.database.session import AsyncSessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
+from app.services.audit_service import _determine_compliance_status
 
 @pytest.mark.asyncio
 async def test_end_to_end_compliance_audit_workflow():
@@ -20,8 +21,7 @@ async def test_end_to_end_compliance_audit_workflow():
             "organisation_name": org_name,
             "name": "Admin Audit",
             "email": admin_email,
-            "password": "securepassword123",
-            "role": "ADMIN"
+            "password": "securepassword123"
         })
         assert reg_admin.status_code == 201
         admin_user_data = reg_admin.json()
@@ -59,7 +59,7 @@ async def test_end_to_end_compliance_audit_workflow():
         assert audit_pre.status_code == 200
         assert audit_pre.json()["status"] == "UNAVAILABLE"
 
-        # 5. Create Reviewer in the SAME organisation directly via DB to preserve tenant isolation
+        # 5. Create Reviewer in the SAME organisation directly via DB (since public registration creates an initial ADMIN per tenant)
         reviewer = User(
             organisation_id=uuid.UUID(organisation_id),
             name="Reviewer Audit",
@@ -101,5 +101,32 @@ async def test_end_to_end_compliance_audit_workflow():
         )
         assert audit_post.status_code == 200
         audit_data = audit_post.json()
-        assert audit_data["status"] == "COMPLETED"
+        assert audit_data["status"] == "COMPLIANT"
+        assert audit_data["validation"]["checks_completed"] is True
+        assert audit_data["validation"]["citations_validated"] is True
+        assert audit_data["validation"]["spans_validated"] is True
         assert "findings" in audit_data
+
+@pytest.mark.parametrize(
+    "all_valid, violations, review_items, expected",
+    [
+        (True, False, False, "COMPLIANT"),
+        (True, True, False, "NON_COMPLIANT"),
+        (True, False, True, "REVIEW_REQUIRED"),
+        (False, False, False, "REVIEW_REQUIRED"),
+        (False, True, True, "NON_COMPLIANT"),
+    ],
+)
+def test_compliance_status_classification(
+    all_valid,
+    violations,
+    review_items,
+    expected,
+):
+    result = _determine_compliance_status(
+        all_findings_valid=all_valid,
+        has_violations=violations,
+        has_review_items=review_items,
+    )
+
+    assert result == expected
