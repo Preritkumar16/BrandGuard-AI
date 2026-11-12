@@ -22,10 +22,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Asset, AssetVersion, AuditFinding, EvidenceReference, User } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card, CardBody, CardHeader } from '../ui/Card';
-import { Tabs } from '../ui/Tabs';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
+import { Card, CardBody, CardHeader } from '../UI/Card';
+import { Tabs } from '../UI/Tabs';
 import { InspectionDiffBox } from '../audit/InspectionDiffBox';
 import { AuditFindingsList } from '../audit/AuditFindingsList';
 import { EvidenceDrawer } from '../audit/EvidenceDrawer';

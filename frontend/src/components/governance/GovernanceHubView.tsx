@@ -31,9 +31,9 @@ import {
   FileText,
 } from 'lucide-react';
 import { BrandSource, User } from '../../types';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
+import { Button } from '../UI/Button';
+import { Badge } from '../UI/Badge';
+import { Card } from '../UI/Card';
 import {
   governanceService,
   ReviewRequiredItem,

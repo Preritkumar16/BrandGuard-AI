@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle, BarChart3, Layers } from 'lucide-react';
-import { Modal } from '../ui/Modal';
-import { Button } from '../ui/Button';
+import { Modal } from '../UI/Modal';
+import { Button } from '../UI/Button';
 
 interface ComplianceHealthModalProps {
   isOpen: boolean;

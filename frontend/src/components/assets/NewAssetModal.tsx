@@ -5,10 +5,10 @@
 
 import React, { useState } from 'react';
 import { Asset } from '../../types';
-import { Modal } from '../ui/Modal';
-import { Input, Textarea } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { Button } from '../ui/Button';
+import { Modal } from '../UI/Modal';
+import { Input, Textarea } from '../UI/Input';
+import { Select } from '../UI/Select';
+import { Button } from '../UI/Button';
 import { assetsService } from '../../services/api/assetsService';
 import { auditService } from '../../services/api/auditService';
 

@@ -6,8 +6,8 @@
 import React from 'react';
 import { BookOpen, Check, ArrowRight } from 'lucide-react';
 import { AuditFinding, EvidenceReference } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 
 interface AuditFindingsListProps {
   findings: AuditFinding[];

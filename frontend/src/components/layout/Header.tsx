@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Search, Bell, Shield, ChevronRight, LogOut } from 'lucide-react';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../UI/Badge';
 import { User } from '../../types';
 import { AppScreen } from '../../config/navigation';
 import { roleLabel } from '../../config/roles';

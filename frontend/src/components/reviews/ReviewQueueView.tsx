@@ -14,9 +14,9 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { ReviewQueueItem, User } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
+import { Card } from '../UI/Card';
 
 interface ReviewQueueViewProps {
   queue: ReviewQueueItem[];

@@ -6,10 +6,10 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, FileText, Upload, Sparkles, BookOpen, AlertCircle } from 'lucide-react';
 import { BrandSource, BrandSourcePassage } from '../../types';
-import { Modal } from '../ui/Modal';
-import { Input, Textarea } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { Button } from '../ui/Button';
+import { Modal } from '../UI/Modal';
+import { Input, Textarea } from '../UI/Input';
+import { Select } from '../UI/Select';
+import { Button } from '../UI/Button';
 import { sourcesService } from '../../services/api/sourcesService';
 
 interface NewSourceModalProps {

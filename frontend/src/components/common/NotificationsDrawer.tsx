@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { X, Bell, Clock, AlertTriangle, ShieldCheck, BookOpen, ArrowRight, Check } from 'lucide-react';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 
 export interface NotificationItem {
   id: string;

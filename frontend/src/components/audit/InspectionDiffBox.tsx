@@ -6,8 +6,8 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, FileText, ArrowRight, Sparkles } from 'lucide-react';
 import { AuditFinding, EvidenceReference } from '../../types';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
+import { Badge } from '../UI/Badge';
+import { Button } from '../UI/Button';
 
 interface InspectionDiffBoxProps {
   originalContent: string;
