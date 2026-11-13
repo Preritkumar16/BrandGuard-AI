@@ -16,6 +16,10 @@ import { StatCard } from '../layout/StatCard';
 
 interface DashboardProps {
   assets: Asset[];
+  creatorSubmissionNotice: {
+    message: string;
+    tone: 'info' | 'warning';
+  } | null;
   sources: BrandSource[];
   queue: ReviewQueueItem[];
   currentUser: User;
@@ -221,7 +225,7 @@ const AdminDashboard: React.FC<DashboardProps> = props => {
 };
 
 const CreatorDashboard: React.FC<DashboardProps> = props => {
-  const { assets, currentUser, onSelectAsset, onNewAssetClick } = props;
+  const { assets, currentUser, onSelectAsset, onNewAssetClick, creatorSubmissionNotice } = props;
   const submissions = assets
     .filter(asset => isAssetOwnedBy(asset, currentUser.id))
     .sort((a, b) => dateValue(b.updated_at) - dateValue(a.updated_at));
@@ -243,6 +247,18 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
       description="Track your content status and the latest available brand-check results."
       actions={      <Button size="sm" className="shadow-sm" onClick={onNewAssetClick}>Submit Content</Button>}
     >
+      {creatorSubmissionNotice && (
+        <div
+          role={creatorSubmissionNotice.tone === 'warning' ? 'alert' : 'status'}
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            creatorSubmissionNotice.tone === 'warning'
+              ? 'border-[#F2C98A] bg-[#FFF7E8] text-[#7A4B00]'
+              : 'border-[#B8D0EA] bg-[#EEF4FA] text-[#315EA8]'
+          }`}
+        >
+          {creatorSubmissionNotice.message}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="My submissions" value={submissions.length} />
         <StatCard label="In review" value={needsReview} tone={needsReview ? 'warn' : 'good'} />
@@ -274,7 +290,21 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
                       <span className="text-xs text-[#5C6878]">
                         {version?.version_number ?? 'Version unavailable'}
                         {' · '}
-                        {summary ? `${summary.total_findings} flagged issues` : 'Brand-check results unavailable'}
+                        {summary
+                          ? `${summary.total_findings} flagged issues · ${
+                            version.audit_source === 'local'
+                              ? version.audit_server_outcome === 'unknown'
+                                ? 'Local rule check · server outcome unconfirmed'
+                                : 'Local rule check (not server/AI)'
+                              : version.audit_source === 'api'
+                                ? 'Server check'
+                                : 'Source unverified'
+                          }`
+                          : version?.audit_status === 'unavailable'
+                            ? version.audit_server_outcome === 'unknown'
+                              ? 'Server audit outcome unconfirmed'
+                              : 'Initial brand check unavailable'
+                            : 'Brand check pending'}
                       </span>
                     </span>
                     <Badge status={asset.current_status} size="sm" />

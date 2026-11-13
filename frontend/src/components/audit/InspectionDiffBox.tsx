@@ -12,6 +12,8 @@ import { Button } from '../UI/Button';
 interface InspectionDiffBoxProps {
   originalContent: string;
   findings: AuditFinding[];
+  auditSource?: 'api' | 'local' | 'unavailable';
+  auditServerOutcome?: 'confirmed' | 'unknown' | 'rejected';
   onSelectEvidence: (evidence: EvidenceReference, ruleTitle: string, severity: AuditFinding['severity']) => void;
   onApplyAllSuggestions?: (newContent: string) => void;
 }
@@ -19,6 +21,8 @@ interface InspectionDiffBoxProps {
 export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
   originalContent,
   findings,
+  auditSource,
+  auditServerOutcome,
   onSelectEvidence,
   onApplyAllSuggestions,
 }) => {
@@ -38,12 +42,26 @@ export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#EF4444]" />
             <span className="text-sm font-semibold text-[#F8FAFC]">
-              AI Inspection Diff Box
+              Brand check results
             </span>
           </div>
           <span className="text-xs text-[#64748B]">|</span>
           <span className="text-xs text-[#94A3B8]">
-            <strong className="text-[#F8FAFC] tabular-nums font-mono">{findings.length}</strong> Evidence-Linked Flags Detected
+            {auditSource === 'api'
+              ? 'Server result'
+              : auditSource === 'local'
+                ? auditServerOutcome === 'unknown'
+                  ? 'Local rule check · server outcome unconfirmed'
+                  : 'Local rule check · not an AI or server result'
+                : auditSource === 'unavailable'
+                  ? auditServerOutcome === 'unknown'
+                    ? 'Server outcome unconfirmed'
+                    : auditServerOutcome === 'rejected'
+                      ? 'Server request rejected'
+                      : 'Check unavailable'
+                  : 'Result source not identified'}
+            {' · '}
+            <strong className="text-[#F8FAFC] tabular-nums font-mono">{findings.length}</strong> Evidence-linked flags
           </span>
         </div>
 
@@ -117,12 +135,12 @@ export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/25">
-                Compliant Revision Target
+                Suggested Revision
               </span>
             </div>
             <span className="text-xs text-[#10B981] flex items-center gap-1">
               <CheckCircle className="w-3 h-3" />
-              Verified Alignment
+              Suggested alignment
             </span>
           </div>
 
@@ -134,7 +152,7 @@ export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
           {findings.length > 0 && (
             <div className="mt-3.5 space-y-2">
               <span className="text-xs font-medium text-[#64748B] block">
-                Approved Replacements Derived from Guidelines:
+                Suggested Replacements from Guidelines:
               </span>
               <div className="space-y-1.5">
                 {findings.map(finding => (

@@ -10,12 +10,20 @@ import { Input, Textarea } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { Button } from '../UI/Button';
 import { assetsService } from '../../services/API/assetsService';
-import { auditService } from '../../services/API/auditService';
+import { AuditDataSource, auditService } from '../../services/API/auditService';
+import { ApiError } from '../../services/API/client';
+
+export interface NewAssetOutcome {
+  asset: Asset;
+  auditSource?: AuditDataSource;
+  auditServerOutcome: 'confirmed' | 'unknown' | 'rejected';
+  auditUnavailable: boolean;
+}
 
 interface NewAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAssetCreated: (asset: Asset) => void;
+  onAssetCreated: (outcome: NewAssetOutcome) => void;
 }
 
 export const NewAssetModal: React.FC<NewAssetModalProps> = ({
@@ -29,6 +37,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uncertainOutcome, setUncertainOutcome] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,27 +46,68 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
+    setError(null);
+    setUncertainOutcome(false);
     try {
-      setIsSubmitting(true);
-      setError(null);
-      const newAsset = await assetsService.createAsset({
+      const creation = await assetsService.createAsset({
         title,
         channel,
         campaign: campaign || 'Standard Marketing Pipeline',
         content,
       });
 
-      // Automatically run initial audit on newly registered draft
-      await auditService.triggerAudit(newAsset.id, newAsset.current_version_id);
+      let auditSource: AuditDataSource | undefined;
+      let auditUnavailable = false;
+      let auditServerOutcome: NewAssetOutcome['auditServerOutcome'] = 'confirmed';
+      const createdAsset = creation.asset;
 
-      onAssetCreated(newAsset);
+      try {
+        const result = await auditService.triggerAudit(
+          createdAsset,
+          createdAsset.current_version_id
+        );
+        auditSource = result.source;
+        auditServerOutcome = result.serverOutcome;
+      } catch (auditError: unknown) {
+        auditServerOutcome = auditError instanceof ApiError
+          ? auditError.outcome
+          : 'unknown';
+        const currentVersion = createdAsset.versions.find(
+          version => version.version_id === createdAsset.current_version_id
+        );
+        if (currentVersion) {
+          currentVersion.audit_status = 'unavailable';
+          currentVersion.audit_source = 'unavailable';
+          currentVersion.audit_server_outcome = auditServerOutcome;
+          delete currentVersion.audit_summary;
+        }
+        assetsService.updateLocalSnapshot(createdAsset);
+        auditUnavailable = true;
+      }
+
+      onAssetCreated({
+        asset: createdAsset,
+        auditSource,
+        auditServerOutcome,
+        auditUnavailable,
+      });
       onClose();
-      // Reset form
       setTitle('');
       setContent('');
       setCampaign('');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to submit asset');
+      if (err instanceof ApiError && err.outcome === 'unknown') {
+        setUncertainOutcome(true);
+        setError("We couldn't confirm whether your submission was saved. Please check My Submissions before trying again.");
+      } else if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        setError('Your submission was rejected because your account could not create content. Your draft is still here.');
+      } else if (err instanceof ApiError && (err.status === 400 || err.status === 422)) {
+        setError('The server rejected your submission. Check the required fields and try again. Your draft is still here.');
+      } else {
+        setUncertainOutcome(true);
+        setError("We couldn't confirm whether your submission was saved. Please check My Submissions before trying again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -98,7 +148,14 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-2.5 rounded bg-[#EF4444]/10 border border-[#EF4444]/30 text-xs text-[#EF4444]">
+          <div
+            role={uncertainOutcome ? 'alert' : 'status'}
+            className={`p-2.5 rounded border text-xs ${
+              uncertainOutcome
+                ? 'bg-[#F59E0B]/10 border-[#F59E0B]/30 text-[#B45309]'
+                : 'bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]'
+            }`}
+          >
             {error}
           </div>
         )}

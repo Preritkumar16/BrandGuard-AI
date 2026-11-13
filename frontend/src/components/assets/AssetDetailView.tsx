@@ -33,6 +33,7 @@ import { EvidenceDrawer } from '../audit/EvidenceDrawer';
 import { DecisionModal } from '../reviews/DecisionModal';
 import { auditService } from '../../services/API/auditService';
 import { assetsService, canCreatorOpenAssetDetails } from '../../services/API/assetsService';
+import { ApiError } from '../../services/API/client';
 import { reviewsService } from '../../services/API/reviewsService';
 
 interface AssetDetailViewProps {
@@ -168,10 +169,17 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
     if (!currentVersion) return;
     try {
       setIsAuditing(true);
-      const result = await auditService.triggerAudit(asset.id, currentVersion.version_id);
+      const result = await auditService.triggerAudit(asset, currentVersion.version_id);
       setFindings(result.findings);
       await loadAsset();
-      setToastMessage(`Governance Audit completed: ${result.summary.total_findings} finding(s) detected.`);
+      setToastMessage(result.source === 'api'
+        ? `Server brand check completed: ${result.summary.total_findings} finding(s) detected.`
+        : `Server audit outcome unconfirmed. A local rule check found ${result.summary.total_findings} issue(s); this is not a server or AI result.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (error: unknown) {
+      setToastMessage(error instanceof ApiError && error.outcome === 'rejected'
+        ? 'The server rejected the brand-check request. No new result was recorded.'
+        : 'The server audit outcome is unconfirmed. No local result was recorded.');
       setTimeout(() => setToastMessage(null), 3500);
     } finally {
       setIsAuditing(false);
@@ -218,12 +226,38 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       });
       setIsCreatingRevision(false);
       setRevisionChangelog('');
-      // Auto run audit on new version
-      await auditService.triggerAudit(asset.id, newVersion.version_id);
+      const assetForAudit: Asset = {
+        ...asset,
+        current_version_id: newVersion.version_id,
+        current_status: 'draft',
+        versions: [
+          ...asset.versions.filter(version => version.version_id !== newVersion.version_id),
+          newVersion,
+        ],
+      };
+      let auditMessage: string;
+      try {
+        const result = await auditService.triggerAudit(assetForAudit, newVersion.version_id);
+        auditMessage = result.source === 'api'
+          ? 'Server brand check completed.'
+          : 'Server audit outcome unconfirmed. A local rule check ran; it is not a server or AI result.';
+      } catch (auditError: unknown) {
+        const serverOutcome = auditError instanceof ApiError
+          ? auditError.outcome
+          : 'unknown';
+        newVersion.audit_status = 'unavailable';
+        newVersion.audit_source = 'unavailable';
+        newVersion.audit_server_outcome = serverOutcome;
+        delete newVersion.audit_summary;
+        assetsService.updateLocalSnapshot(assetForAudit);
+        auditMessage = serverOutcome === 'unknown'
+          ? 'Server audit outcome is unconfirmed; the saved version is preserved.'
+          : 'The server rejected the brand check; the saved version is preserved.';
+      }
       await loadAsset();
       setSelectedVersionId(newVersion.version_id);
       setActiveTab('diff');
-      setToastMessage(`Version ${newVersion.version_number} committed immutably.`);
+      setToastMessage(`Version ${newVersion.version_number} saved. ${auditMessage}`);
       setTimeout(() => setToastMessage(null), 3500);
     } finally {
       setIsSavingRevision(false);
@@ -455,7 +489,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         <div className="p-4 rounded-xl bg-[#111827] border border-[#253047]">
           <div className="text-xs text-[#10B981]">Conforming Clauses</div>
           <div className="text-xl font-bold text-[#10B981] mt-1 tabular-nums font-mono">
-            {currentVersion.audit_summary?.compliant_checks || 18}
+            {currentVersion.audit_summary?.compliant_checks ?? '—'}
           </div>
         </div>
       </div>
@@ -479,6 +513,8 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         <InspectionDiffBox
           originalContent={currentVersion.content}
           findings={findings}
+          auditSource={currentVersion.audit_source}
+          auditServerOutcome={currentVersion.audit_server_outcome}
           onSelectEvidence={(evidence, ruleTitle, severity) =>
             setActiveEvidence({ evidence, ruleTitle, severity })
           }

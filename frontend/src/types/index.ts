@@ -130,6 +130,8 @@ export interface AssetVersion {
   created_at: string;
   created_by: User;
   audit_status: ComplianceStatus;
+  audit_source?: 'api' | 'local' | 'unavailable';
+  audit_server_outcome?: 'confirmed' | 'unknown' | 'rejected';
   audit_summary?: {
     total_findings: number;
     breaches: number;

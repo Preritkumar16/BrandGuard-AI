@@ -79,9 +79,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           assetTitle: asset.title,
           versionNumber: v.version_number,
           type: 'audit_run',
-          author: 'Automated Policy Engine (v4.1.0)',
-          title: `Governance Scan Completed: ${v.audit_summary.total_findings} Flags`,
-          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks.`,
+          author: v.audit_source === 'local' ? 'Local rule check' : 'Automated Policy Engine (v4.1.0)',
+          title: `${v.audit_source === 'local' ? 'Local Rule Check' : 'Governance Scan'} Completed: ${v.audit_summary.total_findings} Flags`,
+          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks.${v.audit_server_outcome === 'unknown' ? ' Server audit outcome is unconfirmed.' : ''}`,
           status: v.audit_status,
           timestamp: v.audit_summary.audit_date,
         });

@@ -14,7 +14,7 @@ import { SourcesView } from './components/sources/SourcesView';
 import { AuditLogView } from './components/audit/AuditLogView';
 import { SettingsView } from './components/settings/SettingsView';
 import { GovernanceHubView } from './components/governance/GovernanceHubView';
-import { NewAssetModal } from './components/assets/NewAssetModal';
+import { NewAssetModal, NewAssetOutcome } from './components/assets/NewAssetModal';
 import { NewSourceModal } from './components/sources/NewSourceModal';
 import { LoginPage } from './components/auth/LoginPage';
 import { RbacMatrixModal } from './components/auth/RbacMatrixModal';
@@ -96,6 +96,10 @@ export default function App() {
 
   // Data states
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [creatorSubmissionNotice, setCreatorSubmissionNotice] = useState<{
+    message: string;
+    tone: 'info' | 'warning';
+  } | null>(null);
   const [sources, setSources] = useState<BrandSource[]>([]);
   const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -246,6 +250,11 @@ export default function App() {
     setIsAuthenticated(false);
   };
 
+  const openNewAssetModal = () => {
+    setCreatorSubmissionNotice(null);
+    setNewAssetModalOpen(true);
+  };
+
   // If user is not authenticated, render dedicated enterprise LoginPage
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
@@ -282,7 +291,7 @@ export default function App() {
         currentScreen={getScreenForTab(currentTab, currentUser.role)}
         onSelectScreen={(screen: AppScreen) => {
           if (screen === 'submit') {
-            setNewAssetModalOpen(true);
+            openNewAssetModal();
             setMobileSidebarOpen(false);
             return;
           }
@@ -355,7 +364,8 @@ export default function App() {
                   onNavigateToSources={handleNavigateToSources}
                   onNavigateToAssets={() => setCurrentTab('assets')}
                   onNavigateToAuditLog={() => setCurrentTab('audit-log')}
-                  onNewAssetClick={() => setNewAssetModalOpen(true)}
+                  onNewAssetClick={openNewAssetModal}
+                  creatorSubmissionNotice={creatorSubmissionNotice}
                   onOpenRbacMatrix={() => setRbacModalOpen(true)}
                   onOpenPolicyRules={() => setPolicyRulesOpen(true)}
                 />
@@ -390,7 +400,7 @@ export default function App() {
                   assets={visibleAssets}
                   currentUser={currentUser}
                   onSelectAsset={handleSelectAsset}
-                  onNewAssetClick={() => setNewAssetModalOpen(true)}
+                  onNewAssetClick={openNewAssetModal}
                 />
               )}
 
@@ -440,11 +450,24 @@ export default function App() {
       <NewAssetModal
         isOpen={newAssetModalOpen}
         onClose={() => setNewAssetModalOpen(false)}
-        onAssetCreated={newAsset => {
-          setAssets(prev => [newAsset, ...prev]);
+        onAssetCreated={(outcome: NewAssetOutcome) => {
+          const { asset, auditSource, auditServerOutcome, auditUnavailable } = outcome;
+          assetsService.updateLocalSnapshot(asset);
+          setAssets(prev => [asset, ...prev.filter(existing => existing.id !== asset.id)]);
+          const auditMessage = auditUnavailable
+            ? auditServerOutcome === 'unknown'
+              ? 'The server audit outcome is unconfirmed; your submission was saved.'
+              : 'The server rejected the initial brand check; your submission was saved.'
+            : auditSource === 'local'
+              ? 'The server audit outcome is unconfirmed. A separate local rule check ran; it is not a server or AI result.'
+              : 'The server brand check completed.';
+          setCreatorSubmissionNotice({
+            message: `The API accepted your submission. ${auditMessage}`,
+            tone: auditUnavailable || auditServerOutcome === 'unknown' ? 'warning' : 'info',
+          });
           setAllowCreatorSubmissionAccess(false);
           setCurrentTab(currentUser.role === 'creator' ? 'dashboard' : 'asset-detail');
-          if (currentUser.role !== 'creator') setSelectedAssetId(newAsset.id);
+          if (currentUser.role !== 'creator') setSelectedAssetId(asset.id);
         }}
       />
 
