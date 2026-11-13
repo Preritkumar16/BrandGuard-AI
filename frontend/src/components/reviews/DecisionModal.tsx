@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, ShieldX, UserX, ShieldAlert } from 'lucide-react';
 import { AssetVersion, User } from '../../types';
 import { Modal } from '../UI/Modal';
@@ -32,6 +32,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submissionInProgress = useRef(false);
 
   const approval = can(currentUser, 'approve_asset', version.created_by.id);
   const canDecide = can(currentUser, 'review_decision').allowed;
@@ -39,6 +40,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   const canApprove = approval.allowed;
 
   const handleSubmit = async () => {
+    if (submissionInProgress.current) return;
     if (!notes.trim()) {
       setError('A formal compliance rationale or reviewer notes are required.');
       return;
@@ -57,6 +59,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
     }
 
     try {
+      submissionInProgress.current = true;
       setIsSubmitting(true);
       setError(null);
       await onSubmitDecision(decision, notes);
@@ -64,6 +67,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to record decision');
     } finally {
+      submissionInProgress.current = false;
       setIsSubmitting(false);
     }
   };
@@ -84,7 +88,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
             size="sm"
             onClick={handleSubmit}
             isLoading={isSubmitting}
-            disabled={decision === 'approved' && !canApprove}
+            disabled={isSubmitting || (decision === 'approved' && !canApprove)}
           >
             Confirm Decision Record
           </Button>
@@ -133,7 +137,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              disabled={!canApprove}
+              disabled={!canApprove || isSubmitting}
               onClick={() => {
                 setDecision('approved');
                 setError(null);
@@ -150,6 +154,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
 
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => {
                 setDecision('revision_requested');
                 setError(null);
@@ -166,6 +171,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
 
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => {
                 setDecision('rejected');
                 setError(null);
@@ -189,6 +195,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
           rows={4}
           value={notes}
           onChange={e => setNotes(e.target.value)}
+          disabled={isSubmitting}
           error={error || undefined}
         />
 

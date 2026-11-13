@@ -5,54 +5,113 @@
 
 import { ReviewDecision, ReviewQueueItem } from '../../types';
 import { MOCK_REVIEW_QUEUE, MOCK_ASSETS } from './mockData';
-import { authService } from './authService';
-import { apiFetch } from './client';
+import { ApiError, apiFetch } from './client';
 
 let inMemoryQueue: ReviewQueueItem[] = [...MOCK_REVIEW_QUEUE];
 
+export type ReviewQueueSource = 'api' | 'demo' | 'unavailable';
+
+export interface ReviewQueueResult {
+  items: ReviewQueueItem[];
+  source: ReviewQueueSource;
+}
+
+export interface SubmitReviewResult {
+  success: boolean;
+  message?: string;
+}
+
+function isReviewQueueItem(value: unknown): value is ReviewQueueItem {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<ReviewQueueItem>;
+  const creator = item.creator;
+  const roles = ['admin', 'source_owner', 'creator', 'reviewer', 'compliance_reviewer'];
+  return typeof item.asset_id === 'string'
+    && typeof item.version_id === 'string'
+    && typeof item.asset_title === 'string'
+    && typeof item.channel === 'string'
+    && typeof item.version_number === 'string'
+    && !!creator
+    && typeof creator.id === 'string'
+    && typeof creator.name === 'string'
+    && typeof creator.email === 'string'
+    && typeof creator.role === 'string'
+    && roles.includes(creator.role)
+    && typeof item.submitted_at === 'string'
+    && Number.isFinite(Date.parse(item.submitted_at))
+    && (item.priority === 'high' || item.priority === 'medium' || item.priority === 'low')
+    && Number.isFinite(item.breach_count)
+    && Number.isFinite(item.warning_count)
+    && typeof item.status === 'string'
+    && Number.isFinite(item.sla_hours_remaining);
+}
+
+function validateQueue(value: unknown): ReviewQueueItem[] {
+  if (!Array.isArray(value) || !value.every(isReviewQueueItem)) {
+    throw new ApiError('The review queue response was incomplete.', 200, value, 'unknown');
+  }
+  return value;
+}
+
+function isReviewDecision(
+  value: unknown,
+  versionId: string,
+  expectedDecision: ReviewDecision['decision']
+): value is ReviewDecision {
+  if (!value || typeof value !== 'object') return false;
+  const decision = value as Partial<ReviewDecision>;
+  const reviewer = decision.reviewer;
+  const roles = ['admin', 'source_owner', 'creator', 'reviewer', 'compliance_reviewer'];
+  return typeof decision.decision_id === 'string'
+    && decision.decision_id.length > 0
+    && decision.version_id === versionId
+    && !!reviewer
+    && typeof reviewer.id === 'string'
+    && typeof reviewer.name === 'string'
+    && typeof reviewer.email === 'string'
+    && typeof reviewer.role === 'string'
+    && roles.includes(reviewer.role)
+    && decision.decision === expectedDecision
+    && typeof decision.notes === 'string'
+    && typeof decision.timestamp === 'string'
+    && Number.isFinite(Date.parse(decision.timestamp));
+}
+
 export const reviewsService = {
-  async getQueue(): Promise<ReviewQueueItem[]> {
+  async getQueue(): Promise<ReviewQueueResult> {
     try {
-      return await apiFetch<ReviewQueueItem[]>('/reviews/queue');
+      return {
+        items: validateQueue(await apiFetch<unknown>('/reviews/queue')),
+        source: 'api',
+      };
     } catch {
-      return [...inMemoryQueue];
+      return { items: [...inMemoryQueue], source: 'demo' };
     }
   },
 
-  async submitReview(assetId: string, versionId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      return await apiFetch(`/assets/${assetId}/versions/${versionId}/submit-review`, {
-        method: 'POST',
-      });
-    } catch {
-      const asset = MOCK_ASSETS.find(a => a.id === assetId);
-      const version = asset?.versions.find(v => v.version_id === versionId);
-      if (!asset || !version) throw new Error('Asset or version not found');
+  async refreshQueue(): Promise<ReviewQueueItem[]> {
+    return validateQueue(await apiFetch<unknown>('/reviews/queue'));
+  },
 
-      version.audit_status = 'in_review';
-      asset.current_status = 'in_review';
-
-      // Check if already in queue
-      const existing = inMemoryQueue.find(q => q.version_id === versionId);
-      if (!existing) {
-        inMemoryQueue.unshift({
-          asset_id: asset.id,
-          version_id: version.version_id,
-          asset_title: asset.title,
-          channel: asset.channel,
-          version_number: version.version_number,
-          creator: version.created_by,
-          submitted_at: new Date().toISOString(),
-          priority: 'high',
-          breach_count: version.audit_summary?.breaches || 0,
-          warning_count: version.audit_summary?.warnings || 0,
-          status: 'in_review',
-          sla_hours_remaining: 8.0,
-        });
-      }
-
-      return { success: true, message: 'Submitted for human review' };
+  async submitReview(assetId: string, versionId: string): Promise<SubmitReviewResult> {
+    const response = await apiFetch<unknown>(`/assets/${assetId}/versions/${versionId}/submit-review`, {
+      method: 'POST',
+    });
+    if (!response || typeof response !== 'object'
+      || typeof (response as Partial<SubmitReviewResult>).success !== 'boolean') {
+      throw new ApiError(
+        'The server response did not confirm the review submission.',
+        200,
+        response,
+        'unknown'
+      );
     }
+
+    const result = response as SubmitReviewResult;
+    return {
+      success: result.success,
+      message: typeof result.message === 'string' ? result.message : undefined,
+    };
   },
 
   /**
@@ -67,50 +126,19 @@ export const reviewsService = {
       notes: string;
     }
   ): Promise<ReviewDecision> {
-    try {
-      return await apiFetch<ReviewDecision>(`/assets/${assetId}/versions/${versionId}/decision`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      const asset = MOCK_ASSETS.find(a => a.id === assetId);
-      const version = asset?.versions.find(v => v.version_id === versionId);
-      if (!asset || !version) throw new Error('Asset or version not found');
-
-      const reviewer = authService.getCurrentUserSync();
-
-      // Rule 6 Enforcement: A creator must not approve their own content!
-      if (payload.decision === 'approved' && version.created_by.id === reviewer.id) {
-        throw new Error('Compliance Violation (Rule 6): A creator cannot approve their own content. Escalation to an independent brand steward is required.');
-      }
-
-      const decisionRecord: ReviewDecision = {
-        decision_id: `dec-${Date.now().toString(36)}`,
-        version_id: versionId,
-        reviewer,
-        decision: payload.decision,
-        notes: payload.notes,
-        timestamp: new Date().toISOString(),
-      };
-
-      version.review_decision = decisionRecord;
-
-      if (payload.decision === 'approved') {
-        version.audit_status = 'approved';
-        asset.current_status = 'approved';
-      } else if (payload.decision === 'rejected') {
-        version.audit_status = 'rejected';
-        asset.current_status = 'rejected';
-      } else {
-        version.audit_status = 'review_required';
-        asset.current_status = 'review_required';
-      }
-
-      // Remove from queue
-      inMemoryQueue = inMemoryQueue.filter(q => q.version_id !== versionId);
-
-      return decisionRecord;
+    const response = await apiFetch<unknown>(`/assets/${assetId}/versions/${versionId}/decision`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!isReviewDecision(response, versionId, payload.decision)) {
+      throw new ApiError(
+        'The server response did not confirm a decision for this version.',
+        200,
+        response,
+        'unknown'
+      );
     }
+    return response;
   },
 
   async getVersionHistory(assetId: string, versionId: string): Promise<ReviewDecision[]> {

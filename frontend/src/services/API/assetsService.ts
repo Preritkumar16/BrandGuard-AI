@@ -5,7 +5,6 @@
 
 import { Asset, AssetVersion } from '../../types';
 import { MOCK_ASSETS } from './mockData';
-import { authService } from './authService';
 import { ApiError, apiFetch } from './client';
 
 let inMemoryAssets: Asset[] = [...MOCK_ASSETS];
@@ -40,6 +39,26 @@ function isAssetWithCurrentVersion(value: unknown): value is Asset {
     );
 }
 
+function isCreatedAssetVersion(
+  value: unknown,
+  assetId: string,
+  previousVersionId: string,
+  expectedContent: string
+): value is AssetVersion {
+  if (!value || typeof value !== 'object') return false;
+  const version = value as Partial<AssetVersion>;
+  return typeof version.version_id === 'string'
+    && version.version_id.length > 0
+    && version.version_id !== previousVersionId
+    && version.asset_id === assetId
+    && typeof version.version_number === 'string'
+    && version.version_number.length > 0
+    && version.content === expectedContent
+    && typeof version.created_at === 'string'
+    && typeof version.created_by?.id === 'string'
+    && typeof version.audit_status === 'string';
+}
+
 function cacheAsset(asset: Asset): void {
   const index = inMemoryAssets.findIndex(item => item.id === asset.id);
   if (index >= 0) {
@@ -50,8 +69,7 @@ function cacheAsset(asset: Asset): void {
 }
 
 export function isAssetOwnedBy(asset: Asset, userId: string): boolean {
-  return asset.created_by.id === userId
-    || asset.versions.some(version => version.created_by.id === userId);
+  return asset.created_by.id === userId;
 }
 
 export function canCreatorOpenAssetDetails(
@@ -121,42 +139,24 @@ export const assetsService = {
    */
   async createAssetVersion(
     assetId: string,
+    previousVersionId: string,
     payload: {
       content: string;
       changelog: string;
     }
   ): Promise<AssetVersion> {
-    try {
-      return await apiFetch<AssetVersion>(`/assets/${assetId}/versions`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      const asset = inMemoryAssets.find(a => a.id === assetId);
-      if (!asset) throw new Error('Asset not found');
-
-      const currentUser = authService.getCurrentUserSync();
-      const nextMajorOrMinor = `v1.${asset.versions.length}`;
-      const versionId = `ver-${assetId}-${nextMajorOrMinor.replace('.', '_')}`;
-
-      const newVersion: AssetVersion = {
-        version_id: versionId,
-        asset_id: assetId,
-        version_number: nextMajorOrMinor,
-        content: payload.content,
-        created_at: new Date().toISOString(),
-        created_by: currentUser,
-        audit_status: 'draft',
-        changelog: payload.changelog,
-      };
-
-      // Newer version resets approval per Product Rule 4
-      asset.versions.push(newVersion);
-      asset.current_version_id = versionId;
-      asset.current_status = 'draft';
-      asset.updated_at = new Date().toISOString();
-
-      return newVersion;
+    const version = await apiFetch<unknown>(`/assets/${assetId}/versions`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!isCreatedAssetVersion(version, assetId, previousVersionId, payload.content)) {
+      throw new ApiError(
+        'The server response did not confirm a new version. The save outcome is unconfirmed.',
+        200,
+        version,
+        'unknown'
+      );
     }
+    return version;
   },
 };

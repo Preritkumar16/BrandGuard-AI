@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { History, ShieldCheck, Play, ArrowRight, User as UserIcon, Filter, Clock } from 'lucide-react';
 import { Asset, User } from '../../types';
+import { getAuditPresentation } from './auditPresentation';
 import { Badge } from '../UI/Badge';
 import { Card } from '../UI/Card';
 import { Select } from '../UI/Select';
@@ -54,7 +55,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       });
 
       // Review decision event (if exists)
-      if (v.review_decision) {
+      if (v.review_decision?.version_id === v.version_id) {
         events.push({
           id: `decision-${v.review_decision.decision_id}`,
           assetId: asset.id,
@@ -73,15 +74,20 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
 
       // Audit run event
       if (v.audit_summary) {
+        const presentation = getAuditPresentation(v);
         events.push({
           id: `audit-${v.version_id}`,
           assetId: asset.id,
           assetTitle: asset.title,
           versionNumber: v.version_number,
           type: 'audit_run',
-          author: v.audit_source === 'local' ? 'Local rule check' : 'Automated Policy Engine (v4.1.0)',
-          title: `${v.audit_source === 'local' ? 'Local Rule Check' : 'Governance Scan'} Completed: ${v.audit_summary.total_findings} Flags`,
-          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks.${v.audit_server_outcome === 'unknown' ? ' Server audit outcome is unconfirmed.' : ''}`,
+          author: presentation.kind === 'local'
+            ? 'Local rule check'
+            : presentation.kind === 'server'
+              ? 'Server-confirmed check'
+              : 'Audit source not confirmed',
+          title: `${presentation.label}: ${v.audit_summary.total_findings} finding(s)`,
+          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks. ${presentation.message}`,
           status: v.audit_status,
           timestamp: v.audit_summary.audit_date,
         });
@@ -106,7 +112,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
             Activity History
           </h1>
           <p className="mt-1 text-sm leading-5 text-[#4B5869]">
-            See content updates, automated checks, and review decisions.
+            See content updates, brand checks, and review decisions.
           </p>
         </div>
 
@@ -116,7 +122,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               { value: 'all', label: 'All Event Types' },
               { value: 'decision', label: 'Review Decisions' },
               { value: 'version_commit', label: 'Version Commits' },
-              { value: 'audit_run', label: 'Automated Scans' },
+              { value: 'audit_run', label: 'Brand Checks' },
             ]}
             value={filterType}
             onChange={e => setFilterType(e.target.value)}

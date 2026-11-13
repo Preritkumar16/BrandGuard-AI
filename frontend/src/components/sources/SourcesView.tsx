@@ -46,6 +46,10 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   const [newText, setNewText] = useState('');
   const [newRuleType, setNewRuleType] = useState<BrandSourcePassage['rule_type']>('mandatory_disclaimer');
   const [isSavingPassage, setIsSavingPassage] = useState(false);
+  const canUploadSource = Boolean(currentUser && can(currentUser, 'upload_source').allowed);
+  const visibleSources = currentUser?.role === 'creator'
+    ? sources.filter(source => source.status === 'approved')
+    : sources;
 
   // Sync activeSourceId whenever selectedSourceId changes from parent
   useEffect(() => {
@@ -62,7 +66,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   }, [initialCategoryFilter]);
 
   // Filter sources
-  const filteredSources = sources.filter(s => {
+  const filteredSources = visibleSources.filter(s => {
     const matchesCategory = categoryFilter === 'all' || s.category === categoryFilter;
     const matchesSearch =
       s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,7 +75,9 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
     return matchesCategory && matchesSearch;
   });
 
-  const activeSource = sources.find(s => s.id === activeSourceId) || filteredSources[0] || sources[0];
+  const activeSource = visibleSources.find(s => s.id === activeSourceId)
+    || filteredSources[0]
+    || visibleSources[0];
 
   const handleCopyPassage = (passageId: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -80,7 +86,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   };
 
   const handleAddPassageSubmit = async () => {
-    if (!activeSource || !newText.trim()) return;
+    if (!canUploadSource || !activeSource || !newText.trim()) return;
     try {
       setIsSavingPassage(true);
       const added = await sourcesService.addPassageToSource(activeSource.id, {
@@ -120,25 +126,20 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           </h1>
           <p className="mt-1 text-sm leading-5 text-[#4B5869]">
             Browse approved guidance, source documents, and their versions.
+            {currentUser?.role === 'creator' && ' Demo fallback data may appear when the API is unavailable.'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {currentUser && !can(currentUser, 'upload_source').allowed && (
-            <span className="text-xs text-[#F59E0B] hidden md:inline">
-              Source upload is limited to Brand Managers and Admins
-            </span>
-          )}
+        {canUploadSource && (
           <Button
             variant="primary"
             size="sm"
-            disabled={!currentUser || !can(currentUser, 'upload_source').allowed}
             leftIcon={<Plus className="w-3.5 h-3.5" />}
             onClick={() => setNewSourceModalOpen(true)}
           >
             Add Brand Source
           </Button>
-        </div>
+        )}
       </div>
 
       {/* Filter and Category Pills & Properly Aligned Search Bar */}
@@ -195,7 +196,9 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
 
           {filteredSources.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#64748B] rounded-xl bg-[#111827] border border-[#253047]">
-              No brand sources match the selected filter.
+              {currentUser?.role === 'creator'
+                ? 'No approved brand guidelines are available.'
+                : 'No brand sources match the selected filter.'}
             </div>
           ) : (
             filteredSources.map(source => {
@@ -261,14 +264,16 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge status={activeSource.status} size="sm" />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<Plus className="w-3.5 h-3.5 text-[#6366F1]" />}
-                    onClick={() => setAddPassageModalOpen(true)}
-                  >
-                    Add Passage
-                  </Button>
+                  {canUploadSource && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Plus className="w-3.5 h-3.5 text-[#6366F1]" />}
+                      onClick={() => setAddPassageModalOpen(true)}
+                    >
+                      Add Passage
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
 
@@ -346,17 +351,19 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
       </div>
 
       {/* New Brand Source Modal */}
-      <NewSourceModal
-        isOpen={newSourceModalOpen}
-        onClose={() => setNewSourceModalOpen(false)}
-        onSourceCreated={newSource => {
-          onSourceCreated(newSource);
-          setActiveSourceId(newSource.id);
-        }}
-      />
+      {canUploadSource && (
+        <NewSourceModal
+          isOpen={newSourceModalOpen}
+          onClose={() => setNewSourceModalOpen(false)}
+          onSourceCreated={newSource => {
+            onSourceCreated(newSource);
+            setActiveSourceId(newSource.id);
+          }}
+        />
+      )}
 
       {/* Add Passage to Existing Source Modal */}
-      {activeSource && (
+      {canUploadSource && activeSource && (
         <Modal
           isOpen={addPassageModalOpen}
           onClose={() => setAddPassageModalOpen(false)}

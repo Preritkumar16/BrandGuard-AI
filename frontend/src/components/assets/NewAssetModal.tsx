@@ -69,6 +69,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
         );
         auditSource = result.source;
         auditServerOutcome = result.serverOutcome;
+        auditUnavailable = result.source === 'unavailable';
       } catch (auditError: unknown) {
         auditServerOutcome = auditError instanceof ApiError
           ? auditError.outcome
@@ -127,7 +128,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Submit Content"
-      description="Register an outbound communication asset. Version v1.0 will be immutably preserved."
+      description="Create a text-based submission and check it against available brand rules."
       maxWidth="xl"
       footer={
         <>
@@ -141,7 +142,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
             isLoading={isSubmitting}
             disabled={!title.trim() || !content.trim()}
           >
-            Create & Run Brand Audit
+            Create & Run Brand Check
           </Button>
         </>
       }
@@ -184,16 +185,20 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
         </div>
 
         <Textarea
-          label="Draft Content / Copy"
-          placeholder="Paste or write your marketing copy here for immediate governance screening..."
+          label="Text content"
+          placeholder="Paste or write the content you want to check..."
           rows={7}
           value={content}
           onChange={e => setContent(e.target.value)}
           required
         />
 
+        <p className="text-xs text-[#64748B]">
+          File upload is not available for content submissions. Paste or enter the text here.
+        </p>
+
         <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] text-[11px] text-[#64748B] space-y-1">
-          <div className="font-semibold text-[#94A3B8]">Automated Brand Checks on Submission:</div>
+          <div className="font-semibold text-[#94A3B8]">Available brand checks:</div>
           <ul className="list-disc list-inside space-y-0.5">
             <li>Regulatory & Legal disclaimer verification (ROI, Safe Harbor)</li>
             <li>Editorial tone and prohibited marketing superlatives</li>

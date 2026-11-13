@@ -4,35 +4,30 @@
  */
 
 import React from 'react';
-import { AlertCircle, CheckCircle, FileText, ArrowRight, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
 import { AuditFinding, EvidenceReference } from '../../types';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
+import { AuditPresentation } from './auditPresentation';
+import { applyUniqueSuggestions } from './textReplacements';
 
 interface InspectionDiffBoxProps {
   originalContent: string;
   findings: AuditFinding[];
-  auditSource?: 'api' | 'local' | 'unavailable';
-  auditServerOutcome?: 'confirmed' | 'unknown' | 'rejected';
+  auditPresentation: AuditPresentation;
   onSelectEvidence: (evidence: EvidenceReference, ruleTitle: string, severity: AuditFinding['severity']) => void;
-  onApplyAllSuggestions?: (newContent: string) => void;
+  onApplyAllSuggestions?: (newContent: string, skippedCount: number) => void;
 }
 
 export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
   originalContent,
   findings,
-  auditSource,
-  auditServerOutcome,
+  auditPresentation,
   onSelectEvidence,
   onApplyAllSuggestions,
 }) => {
-  // Generate suggested text preview
-  let suggestedContent = originalContent;
-  findings.forEach(f => {
-    if (f.flagged_text && f.suggested_replacement) {
-      suggestedContent = suggestedContent.replace(f.flagged_text, f.suggested_replacement);
-    }
-  });
+  const suggestions = applyUniqueSuggestions(originalContent, findings);
+  const canStageSuggestions = suggestions.content !== originalContent;
 
   return (
     <div className="rounded-xl border border-[#253047] bg-[#111827] overflow-hidden shadow-sm">
@@ -40,43 +35,48 @@ export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
       <div className="px-5 py-3.5 border-b border-[#253047] bg-[#0D1220] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#EF4444]" />
+            <span className={`w-2 h-2 rounded-full ${
+              auditPresentation.kind === 'server'
+                ? 'bg-[#10B981]'
+                : auditPresentation.kind === 'local' || auditPresentation.kind === 'pending'
+                  ? 'bg-[#F59E0B]'
+                  : 'bg-[#64748B]'
+            }`} />
             <span className="text-sm font-semibold text-[#F8FAFC]">
               Brand check results
             </span>
           </div>
           <span className="text-xs text-[#64748B]">|</span>
           <span className="text-xs text-[#94A3B8]">
-            {auditSource === 'api'
-              ? 'Server result'
-              : auditSource === 'local'
-                ? auditServerOutcome === 'unknown'
-                  ? 'Local rule check · server outcome unconfirmed'
-                  : 'Local rule check · not an AI or server result'
-                : auditSource === 'unavailable'
-                  ? auditServerOutcome === 'unknown'
-                    ? 'Server outcome unconfirmed'
-                    : auditServerOutcome === 'rejected'
-                      ? 'Server request rejected'
-                      : 'Check unavailable'
-                  : 'Result source not identified'}
+            {auditPresentation.label}
             {' · '}
-            <strong className="text-[#F8FAFC] tabular-nums font-mono">{findings.length}</strong> Evidence-linked flags
+            <strong className="text-[#F8FAFC] tabular-nums font-mono">{findings.length}</strong> finding(s)
           </span>
         </div>
 
         <div className="flex items-center gap-2.5">
-          {onApplyAllSuggestions && findings.length > 0 && (
+          {onApplyAllSuggestions && canStageSuggestions && (
             <Button
               variant="secondary"
               size="sm"
               leftIcon={<CheckCircle className="w-3.5 h-3.5 text-[#10B981]" />}
-              onClick={() => onApplyAllSuggestions(suggestedContent)}
+              onClick={() => onApplyAllSuggestions(suggestions.content, suggestions.skipped)}
             >
-              Stage Revisions in New Version
+              Stage safe suggestions
             </Button>
           )}
         </div>
+      </div>
+      <div className="border-b border-[#253047] px-5 py-2.5 text-xs text-[#94A3B8]">
+        <p>{auditPresentation.message}</p>
+        <p className="mt-1 text-[#64748B]">
+          Suggested replacements are recommendations only and do not guarantee approval.
+        </p>
+        {suggestions.skipped > 0 && (
+          <p className="mt-1 text-[#B45309]">
+            {suggestions.skipped} suggestion(s) were skipped because the match was missing, repeated, or overlapped another suggestion. Review these phrases manually.
+          </p>
+        )}
       </div>
 
       {/* Split Panel Layout */}
@@ -135,17 +135,17 @@ export const InspectionDiffBox: React.FC<InspectionDiffBoxProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/25">
-                Suggested Revision
+                Suggested draft
               </span>
             </div>
             <span className="text-xs text-[#10B981] flex items-center gap-1">
               <CheckCircle className="w-3 h-3" />
-              Suggested alignment
+              Recommendation
             </span>
           </div>
 
           <div className="flex-1 rounded-lg bg-[#0D1220] border border-[#253047] p-4 text-sm leading-relaxed text-[#F8FAFC] whitespace-pre-wrap border-l-2 border-l-[#10B981]">
-            {suggestedContent}
+            {suggestions.content}
           </div>
 
           {/* Inline Approved Replacements list */}

@@ -14,18 +14,21 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { ReviewQueueItem, User } from '../../types';
+import type { ReviewQueueSource } from '../../services/API/reviewsService';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 
 interface ReviewQueueViewProps {
   queue: ReviewQueueItem[];
+  queueSource: ReviewQueueSource;
   currentUser: User;
-  onSelectQueueItem: (assetId: string) => void;
+  onSelectQueueItem: (assetId: string, versionId: string) => void;
 }
 
 export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
   queue,
+  queueSource,
   currentUser,
   onSelectQueueItem,
 }) => {
@@ -67,18 +70,30 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
         </div>
       </div>
 
-      {/* SLA Alert Strip */}
-      <div className="p-3.5 rounded-xl bg-[#0D1220] border border-[#253047] flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2.5">
-          <Clock className="w-4 h-4 text-[#F59E0B]" />
-          <span className="text-[#F8FAFC]">
-            Average Governance Decision Turnaround: <strong className="text-[#F59E0B]"><span className="font-mono">4.2</span> Hours</strong>
+      {queueSource === 'demo' && (
+        <div role="alert" className="rounded-lg border border-[#F2C98A] bg-[#FFF7E8] px-4 py-3 text-sm text-[#7A4B00]">
+          Demo review queue: these are sample records, not live submissions. Sample items cannot be opened for a decision.
+        </div>
+      )}
+      {queueSource === 'unavailable' && (
+        <div role="alert" className="rounded-lg border border-[#F2C98A] bg-[#FFF7E8] px-4 py-3 text-sm text-[#7A4B00]">
+          The live review queue is unavailable. No current queue items are shown.
+        </div>
+      )}
+
+      {queueSource === 'api' && (
+        <div className="p-3.5 rounded-xl bg-[#0D1220] border border-[#253047] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-[#F59E0B]" />
+            <span className="text-[#F8FAFC]">
+              Average Governance Decision Turnaround: <strong className="text-[#F59E0B]"><span className="font-mono">4.2</span> Hours</strong>
+            </span>
+          </div>
+          <span className="text-xs text-[#64748B]">
+            Target SLA: <span className="font-mono">24.0</span> Hours
           </span>
         </div>
-        <span className="text-xs text-[#64748B]">
-          Target SLA: <span className="font-mono">24.0</span> Hours
-        </span>
-      </div>
+      )}
 
       {/* Queue Items */}
       <div className="space-y-3">
@@ -86,9 +101,13 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
           <Card>
             <div className="p-12 text-center text-[#64748B]">
               <CheckCircle2 className="w-10 h-10 mx-auto text-[#10B981] mb-2 opacity-80" />
-              <div className="text-sm font-semibold text-[#F8FAFC]">Review Queue Clear</div>
+              <div className="text-sm font-semibold text-[#F8FAFC]">
+                {queueSource === 'api' ? 'Review Queue Clear' : 'No live queue items available'}
+              </div>
               <p className="text-xs text-[#94A3B8] mt-1">
-                All submitted content versions have received formal human governance decisions.
+                {queueSource === 'api'
+                  ? 'All submitted content versions have received formal human governance decisions.'
+                  : 'The displayed queue data is unavailable or limited to labeled demo records.'}
               </p>
             </div>
           </Card>
@@ -100,8 +119,13 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
               <button
                 type="button"
                 key={item.version_id}
-                onClick={() => onSelectQueueItem(item.asset_id)}
-                className="w-full p-5 rounded-xl bg-[#111827] border border-[#253047] text-left hover:border-[#3B4866] transition-colors cursor-pointer space-y-4 group"
+                disabled={queueSource !== 'api'}
+                onClick={() => onSelectQueueItem(item.asset_id, item.version_id)}
+                className={`w-full p-5 rounded-xl bg-[#111827] border border-[#253047] text-left transition-colors space-y-4 group ${
+                  queueSource === 'api'
+                    ? 'hover:border-[#3B4866] cursor-pointer'
+                    : 'cursor-not-allowed opacity-75'
+                }`}
               >
                 {/* Header row */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -158,8 +182,8 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 text-[#818CF8] group-hover:text-[#C0C1FF] font-medium">
-                    <span>Open Review Workspace</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>{queueSource === 'api' ? 'Open Review Workspace' : 'Sample only — no action'}</span>
+                    {queueSource === 'api' && <ArrowRight className="w-3.5 h-3.5" />}
                   </div>
                 </div>
               </button>

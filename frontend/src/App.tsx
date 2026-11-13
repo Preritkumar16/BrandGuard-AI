@@ -27,10 +27,12 @@ import { authService } from './services/API/authService';
 import { assetsService, canCreatorOpenAssetDetails, isAssetOwnedBy } from './services/API/assetsService';
 import { sourcesService } from './services/API/sourcesService';
 import { reviewsService } from './services/API/reviewsService';
+import type { ReviewQueueSource } from './services/API/reviewsService';
 import { auditService } from './services/API/auditService';
 import { performGlobalSearch } from './services/API/searchService';
 import { Search, FileText, BookOpen, AlertCircle } from 'lucide-react';
 import { AppScreen, NavItem, navigationFor, screenLabel } from './config/navigation';
+import { can } from './config/permissions';
 
 
 // Tabs used by the main application content.
@@ -85,6 +87,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authService.isAuthenticated());
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('asset-sentinel-launch');
+  const [selectedAssetVersionId, setSelectedAssetVersionId] = useState<string | undefined>();
   const [allowCreatorSubmissionAccess, setAllowCreatorSubmissionAccess] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [sourcesCategoryFilter, setSourcesCategoryFilter] = useState<string>('all');
@@ -102,6 +105,7 @@ export default function App() {
   } | null>(null);
   const [sources, setSources] = useState<BrandSource[]>([]);
   const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
+  const [queueSource, setQueueSource] = useState<ReviewQueueSource>('unavailable');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Drawers and Modals
@@ -158,7 +162,8 @@ export default function App() {
       ]);
       setAssets(assetsData);
       setSources(sourcesData);
-      setQueue(queueData);
+      setQueue(queueData.items);
+      setQueueSource(queueData.source);
       setCurrentUser(userData);
     } finally {
       setIsLoading(false);
@@ -219,7 +224,11 @@ export default function App() {
     }
   };
 
-  const handleSelectAsset = (assetId: string, fromCreatorSubmissionList = false) => {
+  const handleSelectAsset = (
+    assetId: string,
+    fromCreatorSubmissionList = false,
+    versionId?: string
+  ) => {
     const selectedAsset = assets.find(asset => asset.id === assetId);
     setAllowCreatorSubmissionAccess(
       currentUser.role === 'creator'
@@ -227,6 +236,7 @@ export default function App() {
         && canCreatorOpenAssetDetails(selectedAsset, currentUser.id, fromCreatorSubmissionList)),
     );
     setSelectedAssetId(assetId);
+    setSelectedAssetVersionId(versionId);
     setCurrentTab('asset-detail');
   };
 
@@ -251,6 +261,7 @@ export default function App() {
   };
 
   const openNewAssetModal = () => {
+    if (!can(currentUser, 'submit_asset').allowed) return;
     setCreatorSubmissionNotice(null);
     setNewAssetModalOpen(true);
   };
@@ -264,13 +275,16 @@ export default function App() {
   const visibleAssets = currentUser.role === 'creator'
     ? assets.filter(asset => isAssetOwnedBy(asset, currentUser.id))
     : assets;
+  const visibleSources = currentUser.role === 'creator'
+    ? sources.filter(source => source.status === 'approved')
+    : sources;
   const visibleAssetIds = new Set(visibleAssets.map(asset => asset.id));
   const visibleVersionIds = new Set(visibleAssets.flatMap(asset => asset.versions.map(version => version.version_id)));
   const allFindings = auditService.getAllFindingsSync();
   const visibleFindings = currentUser.role === 'creator'
     ? Object.fromEntries(Object.entries(allFindings).filter(([versionId]) => visibleVersionIds.has(versionId)))
     : allFindings;
-  const searchResults = performGlobalSearch(searchQuery, visibleAssets, sources, visibleFindings);
+  const searchResults = performGlobalSearch(searchQuery, visibleAssets, visibleSources, visibleFindings);
   const visibleNotifications = currentUser.role === 'creator'
     ? notifications.filter(notification => !notification.assetId || visibleAssetIds.has(notification.assetId))
     : notifications;
@@ -309,9 +323,10 @@ export default function App() {
         currentUser={currentUser}
         onUserChanged={user => {
           setCurrentUser(user);
+          setAllowCreatorSubmissionAccess(false);
+          setSelectedAssetVersionId(undefined);
           if (user.role === 'creator') {
             setCurrentTab('dashboard');
-            setAllowCreatorSubmissionAccess(false);
           }
         }}
         collapsed={sidebarCollapsed}
@@ -356,10 +371,12 @@ export default function App() {
               {currentTab === 'dashboard' && (
                 <RoleDashboard
                   assets={visibleAssets}
-                  sources={sources}
+                  sources={visibleSources}
                   queue={currentUser.role === 'creator' ? [] : queue}
+                  queueSource={queueSource}
                   currentUser={currentUser}
-                  onSelectAsset={assetId => handleSelectAsset(assetId, currentUser.role === 'creator')}
+                  onSelectAsset={(assetId, versionId) =>
+                    handleSelectAsset(assetId, currentUser.role === 'creator', versionId)}
                   onNavigateToQueue={() => setCurrentTab('queue')}
                   onNavigateToSources={handleNavigateToSources}
                   onNavigateToAssets={() => setCurrentTab('assets')}
@@ -373,11 +390,13 @@ export default function App() {
 
               {currentTab === 'governance-hub' && (
                 <GovernanceHubView
-                  sources={sources}
+                  sources={visibleSources}
                   currentUser={currentUser}
                   onNavigateToSources={handleNavigateToSources}
                   onSelectAsset={handleSelectAsset}
-                  onOpenNewSourceModal={() => setNewSourceModalOpen(true)}
+                  onOpenNewSourceModal={() => {
+                    if (can(currentUser, 'upload_source').allowed) setNewSourceModalOpen(true);
+                  }}
                 />
               )}
 
@@ -390,8 +409,9 @@ export default function App() {
               {currentTab === 'queue' && currentUser.role !== 'creator' && (
                 <ReviewQueueView
                   queue={queue}
+                  queueSource={queueSource}
                   currentUser={currentUser}
-                  onSelectQueueItem={handleSelectAsset}
+                  onSelectQueueItem={(assetId, versionId) => handleSelectAsset(assetId, false, versionId)}
                 />
               )}
 
@@ -406,7 +426,7 @@ export default function App() {
 
               {currentTab === 'sources' && (
                 <SourcesView
-                  sources={sources}
+                  sources={visibleSources}
                   onSourceCreated={newSource => {
                     setSources(prev => [newSource, ...prev]);
                     setSelectedSourceId(newSource.id);
@@ -420,8 +440,23 @@ export default function App() {
               {currentTab === 'asset-detail' && (
                 <AssetDetailView
                   assetId={selectedAssetId}
+                  initialVersionId={selectedAssetVersionId}
                   currentUser={currentUser}
                   allowCreatorSubmissionAccess={allowCreatorSubmissionAccess}
+                  onAssetUpdated={updatedAsset => {
+                    setAssets(prev => [updatedAsset, ...prev.filter(asset => asset.id !== updatedAsset.id)]);
+                  }}
+                  onReviewQueueRefresh={async () => {
+                    try {
+                      setQueue(await reviewsService.refreshQueue());
+                      setQueueSource('api');
+                      return true;
+                    } catch {
+                      setQueue([]);
+                      setQueueSource('unavailable');
+                      return false;
+                    }
+                  }}
                   onBack={() => setCurrentTab(currentUser.role === 'creator' ? 'dashboard' : 'assets')}
                   onViewSource={srcId => {
                     setSelectedSourceId(srcId);
@@ -448,7 +483,7 @@ export default function App() {
 
       {/* Submit New Content Modal */}
       <NewAssetModal
-        isOpen={newAssetModalOpen}
+        isOpen={newAssetModalOpen && can(currentUser, 'submit_asset').allowed}
         onClose={() => setNewAssetModalOpen(false)}
         onAssetCreated={(outcome: NewAssetOutcome) => {
           const { asset, auditSource, auditServerOutcome, auditUnavailable } = outcome;
@@ -457,7 +492,9 @@ export default function App() {
           const auditMessage = auditUnavailable
             ? auditServerOutcome === 'unknown'
               ? 'The server audit outcome is unconfirmed; your submission was saved.'
-              : 'The server rejected the initial brand check; your submission was saved.'
+              : auditServerOutcome === 'rejected'
+                ? 'The server rejected the initial brand check; your submission was saved.'
+                : 'The server reported that the initial brand check failed or was unavailable; your submission was saved.'
             : auditSource === 'local'
               ? 'The server audit outcome is unconfirmed. A separate local rule check ran; it is not a server or AI result.'
               : 'The server brand check completed.';
@@ -473,7 +510,7 @@ export default function App() {
 
       {/* Upload/Add Brand Guideline Source Modal */}
       <NewSourceModal
-        isOpen={newSourceModalOpen}
+        isOpen={newSourceModalOpen && can(currentUser, 'upload_source').allowed}
         onClose={() => setNewSourceModalOpen(false)}
         onSourceCreated={newSource => {
           setSources(prev => [newSource, ...prev]);

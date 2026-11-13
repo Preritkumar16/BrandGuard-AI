@@ -9,6 +9,8 @@ import { ROLE_META, roleLabel } from '../../config/roles';
 import { authService } from '../../services/API/authService';
 import { auditService } from '../../services/API/auditService';
 import { isAssetOwnedBy } from '../../services/API/assetsService';
+import type { ReviewQueueSource } from '../../services/API/reviewsService';
+import { getAuditPresentation } from '../audit/auditPresentation';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { Card, CardBody, CardHeader } from '../UI/Card';
@@ -22,8 +24,9 @@ interface DashboardProps {
   } | null;
   sources: BrandSource[];
   queue: ReviewQueueItem[];
+  queueSource: ReviewQueueSource;
   currentUser: User;
-  onSelectAsset: (assetId: string) => void;
+  onSelectAsset: (assetId: string, versionId?: string) => void;
   onNavigateToQueue: () => void;
   onNavigateToSources: (category?: string) => void;
   onNavigateToAssets: () => void;
@@ -63,15 +66,21 @@ function formatDate(value: string): string {
 }
 
 function decisionEvents(assets: Asset[]): DecisionEvent[] {
-  return assets.flatMap(asset => asset.versions.flatMap(version =>
-    version.review_decision
+  const events = assets.flatMap(asset => asset.versions.flatMap(version => {
+    const decision = version.review_decision;
+    return decision?.version_id === version.version_id
       ? [{
           assetTitle: asset.title,
           versionNumber: version.version_number,
-          decision: version.review_decision,
+          decision,
         }]
-      : [],
-  )).sort((a, b) => dateValue(b.decision.timestamp) - dateValue(a.decision.timestamp));
+      : [];
+  }));
+  return [...new Map(events.map(event => [
+    `${event.decision.version_id}:${event.decision.decision_id}`,
+    event,
+  ])).values()]
+    .sort((a, b) => dateValue(b.decision.timestamp) - dateValue(a.decision.timestamp));
 }
 
 function organisationActivity(assets: Asset[], sources: BrandSource[]): ActivityItem[] {
@@ -131,6 +140,17 @@ const ServiceDataNote: React.FC = () => (
   </p>
 );
 
+const QueueDataNotice: React.FC<{ source: ReviewQueueSource }> = ({ source }) => {
+  if (source === 'api') return null;
+  return (
+    <div role="status" className="rounded-lg border border-[#F2C98A] bg-[#FFF7E8] px-4 py-3 text-sm text-[#7A4B00]">
+      {source === 'demo'
+        ? 'Demo review queue: sample records are shown for preview only and are not live submissions.'
+        : 'The live review queue is unavailable; no current queue items are shown.'}
+    </div>
+  );
+};
+
 const DashboardPage: React.FC<{
   title: string;
   description: string;
@@ -144,7 +164,7 @@ const DashboardPage: React.FC<{
 );
 
 const AdminDashboard: React.FC<DashboardProps> = props => {
-  const { assets, sources, queue, onOpenRbacMatrix, onOpenPolicyRules } = props;
+  const { assets, sources, queue, queueSource, onOpenRbacMatrix, onOpenPolicyRules } = props;
   const previewUsers = authService.getAvailableUsers();
   const activity = organisationActivity(assets, sources);
 
@@ -158,9 +178,15 @@ const AdminDashboard: React.FC<DashboardProps> = props => {
         </Button>
       }
     >
+      <QueueDataNotice source={queueSource} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Registered assets" value={assets.length} tone="info" />
-        <StatCard label="Pending reviews" value={queue.length} tone={queue.length ? 'warn' : 'good'} />
+        <StatCard
+          label="Pending reviews"
+          value={queueSource === 'api' ? queue.length : '—'}
+          hint={queueSource === 'api' ? undefined : queueSource === 'demo' ? 'Demo data only' : 'Live queue unavailable'}
+          tone={queueSource === 'api' && queue.length ? 'warn' : 'default'}
+        />
         <StatCard label="Brand sources" value={sources.length} tone="good" />
         <StatCard label="Preview accounts" value={previewUsers.length} hint="Demo identities, not an organisation directory" />
       </div>
@@ -278,6 +304,7 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
             {submissions.map(asset => {
               const version = getLatestVersion(asset);
               const summary = version?.audit_summary;
+              const audit = version ? getAuditPresentation(version) : undefined;
               return (
                 <li key={asset.id}>
                   <button
@@ -291,20 +318,8 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
                         {version?.version_number ?? 'Version unavailable'}
                         {' · '}
                         {summary
-                          ? `${summary.total_findings} flagged issues · ${
-                            version.audit_source === 'local'
-                              ? version.audit_server_outcome === 'unknown'
-                                ? 'Local rule check · server outcome unconfirmed'
-                                : 'Local rule check (not server/AI)'
-                              : version.audit_source === 'api'
-                                ? 'Server check'
-                                : 'Source unverified'
-                          }`
-                          : version?.audit_status === 'unavailable'
-                            ? version.audit_server_outcome === 'unknown'
-                              ? 'Server audit outcome unconfirmed'
-                              : 'Initial brand check unavailable'
-                            : 'Brand check pending'}
+                          ? `${summary.total_findings} finding(s) · ${audit?.label}`
+                          : audit?.label ?? 'Brand check status unavailable'}
                       </span>
                     </span>
                     <Badge status={asset.current_status} size="sm" />
@@ -420,7 +435,7 @@ const BrandManagerDashboard: React.FC<DashboardProps> = props => {
 };
 
 const ReviewerDashboard: React.FC<DashboardProps> = props => {
-  const { assets, queue, onNavigateToQueue, onSelectAsset } = props;
+  const { assets, queue, queueSource, onNavigateToQueue, onSelectAsset } = props;
   const priorityOrder: Record<ReviewQueueItem['priority'], number> = { high: 0, medium: 1, low: 2 };
   const pendingReviews = [...queue].sort((a, b) =>
     priorityOrder[a.priority] - priorityOrder[b.priority]
@@ -434,23 +449,36 @@ const ReviewerDashboard: React.FC<DashboardProps> = props => {
       description="Work through pending reviews by priority and available turnaround time."
       actions={<Button size="sm" className="shadow-sm" onClick={onNavigateToQueue}>Open Review Queue</Button>}
     >
+      <QueueDataNotice source={queueSource} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Pending reviews" value={queue.length} tone={queue.length ? 'warn' : 'good'} />
-        <StatCard label="High priority" value={queue.filter(item => item.priority === 'high').length} tone="warn" />
+        <StatCard
+          label="Pending reviews"
+          value={queueSource === 'api' ? queue.length : '—'}
+          hint={queueSource === 'api' ? undefined : queueSource === 'demo' ? 'Demo data only' : 'Live queue unavailable'}
+          tone={queueSource === 'api' && queue.length ? 'warn' : 'default'}
+        />
+        <StatCard
+          label="High priority"
+          value={queueSource === 'api' ? queue.filter(item => item.priority === 'high').length : '—'}
+          tone={queueSource === 'api' && queue.some(item => item.priority === 'high') ? 'warn' : 'default'}
+        />
         <StatCard label="Recorded decisions" value={decisionEvents(assets).length} tone="info" />
       </div>
 
       <DashboardSection title="Pending reviews">
         {pendingReviews.length === 0 ? (
-          <EmptyState>No pending reviews are available.</EmptyState>
+          <EmptyState>
+            {queueSource === 'api' ? 'No pending reviews are available.' : 'The live review queue is unavailable.'}
+          </EmptyState>
         ) : (
           <ul className="divide-y divide-[#DCE2E9]">
             {pendingReviews.slice(0, 5).map(item => (
               <li key={item.version_id}>
                 <button
                   type="button"
-                  onClick={() => onSelectAsset(item.asset_id)}
-                  className="flex w-full flex-col gap-2 py-3 text-left hover:bg-[#F4F6F9] sm:flex-row sm:items-center sm:justify-between"
+                  disabled={queueSource !== 'api'}
+                  onClick={() => onSelectAsset(item.asset_id, item.version_id)}
+                  className="flex w-full flex-col gap-2 py-3 text-left hover:bg-[#F4F6F9] sm:flex-row sm:items-center sm:justify-between disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-[#1B2533]">{item.asset_title}</span>

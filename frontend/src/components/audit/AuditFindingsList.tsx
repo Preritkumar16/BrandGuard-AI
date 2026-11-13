@@ -13,22 +13,26 @@ interface AuditFindingsListProps {
   findings: AuditFinding[];
   onSelectEvidence: (evidence: EvidenceReference, ruleTitle: string, severity: AuditFinding['severity']) => void;
   onApplySingleSuggestion?: (finding: AuditFinding) => void;
+  emptyStateTitle: string;
+  emptyStateMessage: string;
 }
 
 export const AuditFindingsList: React.FC<AuditFindingsListProps> = ({
   findings,
   onSelectEvidence,
   onApplySingleSuggestion,
+  emptyStateTitle,
+  emptyStateMessage,
 }) => {
   if (findings.length === 0) {
     return (
       <div className="p-8 text-center rounded-xl bg-[#111827] border border-[#253047]">
-        <div className="w-10 h-10 rounded-full bg-[#10B981]/10 border border-[#10B981]/30 flex items-center justify-center text-[#10B981] mx-auto mb-2.5">
-          <Check className="w-5 h-5" />
+        <div className="w-10 h-10 rounded-full bg-[#6366F1]/10 border border-[#6366F1]/30 flex items-center justify-center text-[#818CF8] mx-auto mb-2.5">
+          <BookOpen className="w-5 h-5" />
         </div>
-        <h4 className="text-sm font-semibold text-[#F8FAFC]">No Governance Breaches Detected</h4>
+        <h4 className="text-sm font-semibold text-[#F8FAFC]">{emptyStateTitle}</h4>
         <p className="text-xs text-[#94A3B8] mt-1 max-w-md mx-auto">
-          All passages conform with active brand guidelines across Legal, Tone of Voice, Trademark, and Security policies.
+          {emptyStateMessage}
         </p>
       </div>
     );
@@ -36,6 +40,9 @@ export const AuditFindingsList: React.FC<AuditFindingsListProps> = ({
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-[#64748B]">
+        Suggested replacements are recommendations only and do not guarantee approval.
+      </p>
       {findings.map(finding => {
         return (
           <div
@@ -81,7 +88,7 @@ export const AuditFindingsList: React.FC<AuditFindingsListProps> = ({
 
               <div className="p-2.5 rounded-md bg-[#0D1220] border border-[#253047] space-y-1">
                 <span className="text-xs text-[#10B981] block font-semibold">
-                  Approved Standard Replacement
+                  Suggested replacement
                 </span>
                 <div className="text-[#10B981]">
                   "{finding.suggested_replacement}"

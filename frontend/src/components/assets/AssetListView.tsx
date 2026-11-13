@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Search, Filter, Plus, ArrowRight, Layers, FileText, X } from 'lucide-react';
 import { Asset, User } from '../../types';
 import { isAssetOwnedBy } from '../../services/API/assetsService';
+import { can } from '../../config/permissions';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
@@ -32,6 +33,7 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
   const visibleAssets = currentUser.role === 'creator'
     ? assets.filter(asset => isAssetOwnedBy(asset, currentUser.id))
     : assets;
+  const canSubmitAssets = can(currentUser, 'submit_asset').allowed;
   const filteredAssets = visibleAssets.filter(asset => {
     const matchesSearch =
       asset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -56,14 +58,16 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus className="w-3.5 h-3.5" />}
-          onClick={onNewAssetClick}
-        >
-          Submit Content
-        </Button>
+        {canSubmitAssets && (
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus className="w-3.5 h-3.5" />}
+            onClick={onNewAssetClick}
+          >
+            Submit Content
+          </Button>
+        )}
       </div>
 
       {/* Filter and Search Bar */}

@@ -11,7 +11,7 @@ import { assetsService } from './assetsService';
 
 const inMemoryFindings: Record<string, AuditFinding[]> = { ...MOCK_FINDINGS };
 
-export type AuditDataSource = 'api' | 'local';
+export type AuditDataSource = 'api' | 'local' | 'unavailable';
 
 export interface AuditSummary {
   total_findings: number;
@@ -98,7 +98,7 @@ function attachAuditResult(
   version.audit_source = source;
   version.audit_server_outcome = serverOutcome;
   version.audit_summary = result.summary;
-  asset.current_status = result.status;
+  if (asset.current_version_id === versionId) asset.current_status = result.status;
   inMemoryFindings[versionId] = result.findings;
   assetsService.updateLocalSnapshot(asset);
 }
@@ -277,9 +277,11 @@ async function runLocalAudit(asset: Asset, versionId: string): Promise<AuditResu
 export const auditService = {
   async getFindings(assetId: string, versionId: string): Promise<AuditFinding[]> {
     try {
-      return await apiFetch<AuditFinding[]>(`/assets/${assetId}/versions/${versionId}/findings`);
+      const findings = await apiFetch<AuditFinding[]>(`/assets/${assetId}/versions/${versionId}/findings`);
+      return findings.filter(finding => finding.version_id === versionId);
     } catch {
-      return inMemoryFindings[versionId] || [];
+      return (inMemoryFindings[versionId] || [])
+        .filter(finding => finding.version_id === versionId);
     }
   },
 
@@ -305,6 +307,10 @@ export const auditService = {
       });
       if (!isApiAuditResult(response, versionId)) {
         return runLocalAudit(asset, versionId);
+      }
+      if (response.status === 'failed' || response.status === 'unavailable') {
+        attachAuditResult(asset, versionId, response, 'unavailable', 'confirmed');
+        return { ...response, source: 'unavailable', serverOutcome: 'confirmed' };
       }
       attachAuditResult(asset, versionId, response, 'api', 'confirmed');
       return { ...response, source: 'api', serverOutcome: 'confirmed' };
