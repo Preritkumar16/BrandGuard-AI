@@ -61,6 +61,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
             Mark all read
           </Button>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 rounded text-[#64748B] hover:text-[#F8FAFC] hover:bg-[#161E2E] transition-colors cursor-pointer"
           >
@@ -77,7 +78,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
           </div>
         ) : (
           notifications.map(n => (
-            <div
+            <button
+              type="button"
               key={n.id}
               onClick={() => {
                 if (n.assetId) {
@@ -88,7 +90,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                   onClose();
                 }
               }}
-              className={`p-3.5 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
+              className={`w-full p-3.5 rounded-lg border text-left transition-colors cursor-pointer space-y-1.5 ${
                 !n.read
                   ? 'bg-[#161E2E] border-[#3B4866]'
                   : 'bg-[#0D1220]/60 border-[#253047] hover:border-[#3B4866]'
@@ -107,14 +109,14 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
               </p>
 
               <div className="pt-1 flex items-center justify-between text-[11px] text-[#818CF8]">
-                <span className="flex items-center gap-1 text-[10px] uppercase font-mono text-[#64748B]">
+                <span className="flex items-center gap-1 text-xs text-[#64748B]">
                   {n.type.replace('_', ' ')}
                 </span>
                 <span className="flex items-center gap-1 hover:underline">
                   Inspect <ArrowRight className="w-3 h-3" />
                 </span>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>

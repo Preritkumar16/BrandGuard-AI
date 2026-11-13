@@ -29,13 +29,15 @@ export const Tabs: React.FC<TabsProps> = ({
 }) => {
   if (variant === 'pills') {
     return (
-      <div className={`inline-flex items-center p-1 bg-[#0D1220] border border-[#253047] rounded-lg ${className}`}>
+      <div role="group" aria-label="Select a view" className={`inline-flex items-center p-1 bg-[#0D1220] border border-[#253047] rounded-lg ${className}`}>
         {tabs.map(tab => {
           const isActive = tab.id === activeTab;
           return (
             <button
+              type="button"
               key={tab.id}
               onClick={() => onChange(tab.id)}
+              aria-pressed={isActive}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 isActive
                   ? 'bg-[#161E2E] text-[#F8FAFC] shadow-xs border border-[#253047]'
@@ -63,13 +65,15 @@ export const Tabs: React.FC<TabsProps> = ({
   }
 
   return (
-    <div className={`flex border-b border-[#253047] gap-6 ${className}`}>
+    <div role="group" aria-label="Select a view" className={`flex max-w-full overflow-x-auto border-b border-[#253047] gap-5 ${className}`}>
       {tabs.map(tab => {
         const isActive = tab.id === activeTab;
         return (
           <button
+            type="button"
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            aria-pressed={isActive}
             className={`flex items-center gap-2 pb-3 text-xs font-medium transition-colors relative cursor-pointer ${
               isActive
                 ? 'text-[#F8FAFC] font-semibold'

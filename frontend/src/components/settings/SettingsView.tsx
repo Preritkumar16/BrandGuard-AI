@@ -11,6 +11,8 @@ import { Input } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { Badge } from '../UI/Badge';
 import { User } from '../../types';
+import { can } from '../../config/permissions';
+import { roleLabel } from '../../config/roles';
 
 interface SettingsViewProps {
   currentUser?: User;
@@ -23,7 +25,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
   const [requireDisclaimerFootnotes, setRequireDisclaimerFootnotes] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser ? can(currentUser, 'manage_settings').allowed : false;
 
   const handleSave = () => {
     if (!isAdmin) return;
@@ -37,18 +39,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-              Governance Engine & Policy Settings
+            <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+              Settings
             </h1>
             <Badge
               variant={isAdmin ? 'info' : 'warning'}
               size="sm"
             >
-              {isAdmin ? 'ADMIN AUTHORIZED' : 'READ-ONLY ACCESS'}
+              {isAdmin ? 'Admin authorized' : 'Read-only access'}
             </Badge>
           </div>
-          <p className="text-xs text-[#94A3B8]">
-            Configure compliance review thresholds, SLA targets, and enforcement strictness.
+          <p className="text-sm leading-5 text-[#4B5869]">
+            Review the available review and policy controls.
           </p>
         </div>
 
@@ -59,7 +61,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
           leftIcon={savedSuccess ? <Check className="w-3.5 h-3.5 text-[#10B981]" /> : <Save className="w-3.5 h-3.5" />}
           onClick={handleSave}
         >
-          {savedSuccess ? 'Settings Saved' : 'Save Configuration'}
+          {savedSuccess ? 'Held in this session' : 'Save Configuration'}
         </Button>
       </div>
 
@@ -68,13 +70,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
         <div className="p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-xs text-[#F59E0B] flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <span className="font-bold uppercase tracking-wider font-mono">
+            <span className="font-semibold">
               Role-Based Access Control Notice
             </span>
             <p className="text-[#F8FAFC]/90 leading-relaxed">
               You are signed in as <strong>{currentUser?.name}</strong> with role{' '}
-              <span className="font-semibold uppercase text-[#F59E0B]">{currentUser?.role}</span>.
-              Only users with the <strong>Admin</strong> role (e.g. Elena Rostova) are authorized to modify global governance parameters, SLA thresholds, and engine strictness. You may view these settings in read-only mode.
+              <span className="font-semibold text-[#F59E0B]">
+                {currentUser ? roleLabel(currentUser.role) : 'Unknown'}
+              </span>.
+              Only an Admin can change these controls in the interface. You can read them. Saving does not call a backend settings endpoint.
             </p>
           </div>
         </div>
@@ -83,7 +87,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-center gap-2">
           <Check className="w-4 h-4 shrink-0" />
-          <span>Governance policy thresholds have been updated and synced to the active policy engine.</span>
+          <span>These values stay in this browser session. No settings endpoint is connected, so nothing was written to the backend.</span>
         </div>
       )}
 

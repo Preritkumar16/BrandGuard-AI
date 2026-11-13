@@ -10,6 +10,7 @@ from app.models.evidence_link import EvidenceLink
 from app.models.dependency import Dependency
 from app.models.review_event import ReviewEvent
 from app.models.approval import Approval
+from app.models.audit_run import (AuditRun, AuditRunStatus, AuditComplianceStatus)
 
 __all__ = [
     "Organisation",
@@ -28,4 +29,7 @@ __all__ = [
     "Dependency",
     "ReviewEvent",
     "Approval",
+    "AuditRun",
+    "AuditRunStatus",
+    "AuditComplianceStatus",
 ]

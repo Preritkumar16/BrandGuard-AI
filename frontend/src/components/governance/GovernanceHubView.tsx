@@ -30,7 +30,7 @@ import {
   X,
   FileText,
 } from 'lucide-react';
-import { BrandSource, User } from '../../types';
+import { BackendBrandSource, User } from '../../types';
 import { Button } from '../UI/Button';
 import { Badge } from '../UI/Badge';
 import { Card } from '../UI/Card';
@@ -42,7 +42,7 @@ import {
 } from '../../services/API/governanceService';
 
 interface GovernanceHubViewProps {
-  sources: BrandSource[];
+  sources: BackendBrandSource[];
   currentUser: User;
   onNavigateToSources: (category?: string) => void;
   onSelectAsset?: (assetId: string) => void;
@@ -77,7 +77,6 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
     governanceService.verifyApprovalIntegrity('appr-sec-9941a8').then(setVerificationResult);
   }, []);
 
-  const totalPassages = sources.reduce((acc, s) => acc + (s.passage_count || 0), 0);
   const pendingReAudits = reviewRequiredList.filter(r => r.status === 'pending_re_audit').length;
   const reAuditedCount = reviewRequiredList.filter(r => r.status === 're_audited').length;
 
@@ -182,8 +181,8 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium tracking-wide bg-[#6366F1]/20 text-[#818CF8] border border-[#6366F1]/30">
-                GOVERNANCE & POLICY ASSURANCE
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#6366F1]/20 text-[#818CF8] border border-[#6366F1]/30">
+                Governance and policy
               </span>
               <span className="text-xs text-[#64748B] font-mono">Screen 4 • Spec §6</span>
             </div>
@@ -260,7 +259,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
           </div>
           <button
             onClick={() => setReAuditSuccessMessage(null)}
-            className="text-[#94A3B8] hover:text-[#F8FAFC] text-xs font-mono"
+            className="text-[#94A3B8] hover:text-[#F8FAFC] text-xs"
           >
             Dismiss
           </button>
@@ -403,7 +402,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                             }
                             size="sm"
                           >
-                            {item.urgency.toUpperCase()}
+                            {item.urgency}
                           </Badge>
                           <Badge
                             variant={
@@ -416,10 +415,10 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                             size="sm"
                           >
                             {item.status === 're_audited'
-                              ? 'RE-AUDITED'
+                              ? 'Re-audited'
                               : item.status === 'exempted'
-                              ? 'EXEMPTED'
-                              : 'REVIEW REQUIRED'}
+                              ? 'Exempted'
+                              : 'Review required'}
                           </Badge>
                         </div>
 
@@ -475,7 +474,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                             )}
                           </>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-xs text-[#10B981] font-mono py-1">
+                          <div className="flex items-center gap-1.5 text-xs text-[#10B981] py-1">
                             <CheckCircle2 className="w-4 h-4" />
                             <span>Re-Audit Synchronized</span>
                           </div>
@@ -507,7 +506,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
               </p>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-mono text-[#94A3B8]">
+                <label className="text-sm text-[#94A3B8]">
                   Approval Identifier (UUID or Token)
                 </label>
                 <input
@@ -532,18 +531,18 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
               </div>
 
               <div className="pt-4 border-t border-[#253047] text-[11px] text-[#64748B] space-y-1.5">
-                <div className="font-mono text-[#818CF8]">Sample Test Tokens:</div>
+                <div className="text-sm font-medium text-[#818CF8]">Sample Test Tokens:</div>
                 <div
                   onClick={() => setVerificationInputId('appr-sec-9941a8')}
-                  className="font-mono hover:text-[#F8FAFC] cursor-pointer p-1.5 rounded hover:bg-[#161E2E] transition-colors"
+                  className="hover:text-[#F8FAFC] cursor-pointer p-1.5 rounded hover:bg-[#161E2E] transition-colors"
                 >
-                  • appr-sec-9941a8 (Signed by Sarah Chen, Lead Steward)
+                  • <span className="font-mono">appr-sec-9941a8</span> (Signed by Ananya Mehta, Reviewer)
                 </div>
                 <div
                   onClick={() => setVerificationInputId('appr-fin-3401x2')}
-                  className="font-mono hover:text-[#F8FAFC] cursor-pointer p-1.5 rounded hover:bg-[#161E2E] transition-colors"
+                  className="hover:text-[#F8FAFC] cursor-pointer p-1.5 rounded hover:bg-[#161E2E] transition-colors"
                 >
-                  • appr-fin-3401x2 (FinTech Cloud Case Study Sign-off)
+                  • <span className="font-mono">appr-fin-3401x2</span> (FinTech Cloud Case Study Sign-off)
                 </div>
               </div>
             </div>
@@ -562,7 +561,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                       <div className="text-sm font-bold text-[#F8FAFC] flex items-center gap-2">
                         <span>Approval Cryptographically Valid</span>
                         <Badge variant="compliant" size="sm">
-                          TAMPER-FREE
+                          Tamper-free
                         </Badge>
                       </div>
                       <div className="text-xs text-[#64748B] font-mono mt-0.5">
@@ -605,7 +604,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
 
                 <div className="flex items-center gap-2 text-xs text-[#94A3B8] pt-2">
                   <Lock className="w-3.5 h-3.5 text-[#10B981]" />
-                  <span>Rule 6 Compliance: Reviewer identity verified independent from creator Alex Rivera.</span>
+                  <span>Rule 6 Compliance: Reviewer identity verified independent from creator Rohit Sharma.</span>
                 </div>
               </div>
             ) : (
@@ -629,7 +628,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                 Deterministic and semantic audit modules orchestrated in pipeline sequence with zero conversational latency or bloat.
               </p>
             </div>
-            <span className="text-xs font-mono text-[#10B981] flex items-center gap-1.5">
+            <span className="text-xs text-[#10B981] flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
               All 6 Modules Operational
             </span>
@@ -652,7 +651,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                     <div className="text-[11px] text-[#94A3B8] mt-0.5">{mod.role}</div>
                   </div>
                   <Badge variant="compliant" size="sm">
-                    {mod.status.toUpperCase()}
+                    {mod.status.replaceAll('_', ' ')}
                   </Badge>
                 </div>
 
@@ -667,14 +666,14 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono border-t border-[#253047]">
+                <div className="grid grid-cols-2 gap-2 pt-1 text-xs border-t border-[#253047]">
                   <div>
                     <span className="text-[#64748B] block text-[10px]">Latency</span>
-                    <span className="text-[#F8FAFC]">{mod.latencyMs} ms</span>
+                    <span className="text-[#F8FAFC] font-mono">{mod.latencyMs} ms</span>
                   </div>
                   <div>
                     <span className="text-[#64748B] block text-[10px]">Precision</span>
-                    <span className="text-[#10B981]">{mod.metrics.precision}</span>
+                    <span className="text-[#10B981] font-mono">{mod.metrics.precision}</span>
                   </div>
                 </div>
               </div>
@@ -695,7 +694,7 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                 Active statutory requirements mapped directly to deterministic brand rule checks for enterprise legal compliance.
               </p>
             </div>
-            <span className="text-xs font-mono text-[#818CF8]">
+            <span className="text-xs text-[#818CF8]">
               5 Global Jurisdictions Active
             </span>
           </div>
@@ -709,10 +708,10 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold text-[#F8FAFC]">{reg.name}</h3>
-                    <div className="text-xs text-[#818CF8] font-mono mt-0.5">{reg.authority}</div>
+                    <div className="text-xs text-[#818CF8] mt-0.5">{reg.authority}</div>
                   </div>
                   <Badge variant="compliant" size="sm">
-                    {reg.complianceScore} COMPLIANT
+                    {reg.complianceScore} compliant
                   </Badge>
                 </div>
 
@@ -720,14 +719,14 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
                   {reg.description}
                 </p>
 
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#253047] text-[11px] font-mono">
+                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#253047] text-xs">
                   <div>
                     <span className="text-[#64748B] block text-[10px]">Scope</span>
                     <span className="text-[#F8FAFC] truncate block">{reg.scope}</span>
                   </div>
                   <div>
                     <span className="text-[#64748B] block text-[10px]">Active Rules</span>
-                    <span className="text-[#10B981]">{reg.ruleCount} checks</span>
+                    <span className="text-[#10B981]"><span className="font-mono">{reg.ruleCount}</span> checks</span>
                   </div>
                   <div>
                     <span className="text-[#64748B] block text-[10px]">Last Audit</span>

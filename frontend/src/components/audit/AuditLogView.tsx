@@ -12,11 +12,13 @@ import { Select } from '../UI/Select';
 
 interface AuditLogViewProps {
   assets: Asset[];
+  currentUser: User;
   onSelectAsset: (assetId: string) => void;
 }
 
 export const AuditLogView: React.FC<AuditLogViewProps> = ({
   assets,
+  currentUser,
   onSelectAsset,
 }) => {
   const [filterType, setFilterType] = useState<string>('all');
@@ -60,8 +62,10 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           versionNumber: v.version_number,
           type: 'decision',
           author: v.review_decision.reviewer.name,
-          title: `Formal Review Decision: ${v.review_decision.decision.toUpperCase()}`,
-          details: v.review_decision.notes,
+          title: `Formal Review Decision: ${v.review_decision.decision.replaceAll('_', ' ')}`,
+          details: currentUser.role === 'creator'
+            ? 'Reviewer notes are unavailable because their visibility is not specified.'
+            : v.review_decision.notes,
           status: v.review_decision.decision,
           timestamp: v.review_decision.timestamp,
         });
@@ -75,9 +79,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           assetTitle: asset.title,
           versionNumber: v.version_number,
           type: 'audit_run',
-          author: 'Automated Policy Engine (v4.1.0)',
-          title: `Governance Scan Completed: ${v.audit_summary.total_findings} Flags`,
-          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks.`,
+          author: v.audit_source === 'local' ? 'Local rule check' : 'Automated Policy Engine (v4.1.0)',
+          title: `${v.audit_source === 'local' ? 'Local Rule Check' : 'Governance Scan'} Completed: ${v.audit_summary.total_findings} Flags`,
+          details: `${v.audit_summary.breaches} breaches, ${v.audit_summary.warnings} warnings, ${v.audit_summary.compliant_checks} compliant checks.${v.audit_server_outcome === 'unknown' ? ' Server audit outcome is unconfirmed.' : ''}`,
           status: v.audit_status,
           timestamp: v.audit_summary.audit_date,
         });
@@ -98,11 +102,11 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-            Immutable Audit Trail & Governance Log
+          <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+            Activity History
           </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Complete append-only historical ledger of policy scans, version commits, and formal human reviewer decisions.
+          <p className="mt-1 text-sm leading-5 text-[#4B5869]">
+            See content updates, automated checks, and review decisions.
           </p>
         </div>
 
@@ -124,10 +128,11 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       <Card>
         <div className="divide-y divide-[#253047]/60">
           {filteredEvents.map(event => (
-            <div
+            <button
+              type="button"
               key={event.id}
               onClick={() => onSelectAsset(event.assetId)}
-              className="p-4 hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+              className="w-full p-4 text-left hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
             >
               <div className="flex items-start gap-3">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
@@ -176,7 +181,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                   <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </Card>

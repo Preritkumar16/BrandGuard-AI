@@ -17,13 +17,13 @@ export const Card: React.FC<CardProps> = ({
   className = '',
   ...props
 }) => {
-  const baseClasses = 'rounded-xl border transition-all duration-150';
+  const baseClasses = 'rounded-lg border transition-colors duration-150';
   const surfaceClasses = elevated
-    ? 'bg-[#161E2E] border-[#253047] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
+    ? 'bg-[#161E2E] border-[#253047]'
     : 'bg-[#111827] border-[#253047]';
 
   const interactiveClasses = interactive
-    ? 'hover:border-[#3B4866] hover:-translate-y-px cursor-pointer'
+    ? 'hover:border-[#3B4866] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315EA8]'
     : '';
 
   return (

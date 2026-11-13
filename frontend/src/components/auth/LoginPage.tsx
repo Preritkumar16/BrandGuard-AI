@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,18 +10,17 @@ import {
   Lock,
   Mail,
   User,
+  Building2,
   ArrowRight,
   Shield,
   CheckCircle2,
   XCircle,
-  KeyRound,
-  Layers,
 } from 'lucide-react';
-import { UserRole, User as UserType } from '../../types';
-import { authService, ROLE_DEFINITIONS } from '../../services/API/authService';
+
+import { User as UserType } from '../../types';
+import { authService } from '../../services/API/authService';
 import { Button } from '../UI/Button';
 import { Input } from '../UI/Input';
-import { Select } from '../UI/Select';
 import { Badge } from '../UI/Badge';
 
 interface LoginPageProps {
@@ -29,30 +29,35 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
-  const [email, setEmail] = useState('marcus.vance@brandguard.internal');
-  const [password, setPassword] = useState('••••••••••••');
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const [organisationName, setOrganisationName] = useState('');
   const [name, setName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('creator');
-  const [title, setTitle] = useState('');
+  const [registrationPassword, setRegistrationPassword] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const availableUsers = authService.getAvailableUsers();
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setError('Please provide an enterprise work email.');
+
+    if (!email.trim() || !password) {
+      setError('Please enter your email address and password.');
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      const user = await authService.login(email, password);
+      setSuccess(null);
+
+      const user = await authService.login(email.trim(), password);
       onLoginSuccess(user);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : 'Authentication failed.');
     } finally {
       setIsLoading(false);
     }
@@ -60,33 +65,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      setError('Name and work email are required.');
+
+    if (!organisationName.trim() || !name.trim() || !email.trim() || !registrationPassword) {
+      setError('Please complete all required fields.');
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      const user = await authService.register({
-        name,
-        email,
-        role: selectedRole,
-        title: title || (selectedRole === 'admin' ? 'Brand Administrator' : selectedRole === 'reviewer' ? 'Compliance Reviewer' : 'Marketing Specialist'),
-      });
-      onLoginSuccess(user);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setSuccess(null);
 
-  const handleQuickSignIn = async (userId: string) => {
-    try {
-      setIsLoading(true);
-      const user = await authService.switchUser(userId);
-      onLoginSuccess(user);
+      await authService.register({
+        organisation_name: organisationName.trim(),
+        name: name.trim(),
+        email: email.trim(),
+        password: registrationPassword,
+      });
+
+      // Registration creates the account but does not authenticate the user.
+      setPassword('');
+      setRegistrationPassword('');
+      setActiveTab('signin');
+
+      setSuccess(
+        'Account created successfully. Please sign in using your registered email and password.'
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Registration failed.');
     } finally {
       setIsLoading(false);
     }
@@ -95,23 +101,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen bg-[#0B0F19] text-[#F8FAFC] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full mx-auto space-y-8">
-        {/* Brand Logo & Headline */}
+
+        {/* Brand Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#6366F1]/10 border border-[#6366F1]/30 text-[#6366F1] shadow-[0_0_24px_-4px_rgba(99,102,241,0.35)] mb-2">
             <ShieldCheck className="w-7 h-7" />
           </div>
+
           <h1 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">
             BrandGuard AI
           </h1>
+
           <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
             Enterprise Brand Governance & Evidence-Linked Content Compliance Console
           </p>
         </div>
 
-        {/* Main Grid: Sign In Form + Role Based Access Matrix */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Form (7 Cols) */}
+
+          {/* Authentication Form */}
           <div className="lg:col-span-7 bg-[#111827] border border-[#253047] rounded-xl shadow-[0_12px_32px_-4px_rgba(0,0,0,0.65)] p-6 space-y-6">
+
             {/* Tabs */}
             <div className="flex border-b border-[#253047]">
               <button
@@ -119,6 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 onClick={() => {
                   setActiveTab('signin');
                   setError(null);
+                  setSuccess(null);
                 }}
                 className={`flex-1 pb-3 text-xs font-semibold text-center border-b-2 transition-colors cursor-pointer ${
                   activeTab === 'signin'
@@ -128,11 +139,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               >
                 Enterprise Credentials Sign In
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab('register');
                   setError(null);
+                  setSuccess(null);
                 }}
                 className={`flex-1 pb-3 text-xs font-semibold text-center border-b-2 transition-colors cursor-pointer ${
                   activeTab === 'register'
@@ -140,59 +153,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     : 'border-transparent text-[#94A3B8] hover:text-[#F8FAFC]'
                 }`}
               >
-                Provision New Account
+                Create Organisation Account
               </button>
             </div>
 
+            {/* Feedback */}
             {error && (
               <div className="p-3 rounded-lg bg-[#EF4444]/10 border border-[#EF4444]/30 text-xs text-[#EF4444]">
                 {error}
               </div>
             )}
 
-            {/* Quick Demo Role Selector */}
-            <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] space-y-2">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-[#64748B] block">
-                Quick Role-Based Demo Sign-In (Select Persona):
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {availableUsers.map(user => {
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => handleQuickSignIn(user.id)}
-                      className="p-2.5 rounded-md bg-[#161E2E] border border-[#253047] hover:border-[#6366F1] transition-all text-left group cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors truncate">
-                          {user.name.split(' ')[0]}
-                        </span>
-                        <Badge
-                          variant={
-                            user.role === 'admin'
-                              ? 'info'
-                              : user.role === 'reviewer'
-                              ? 'compliant'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {user.role}
-                        </Badge>
-                      </div>
-                      <div className="text-[10px] text-[#94A3B8] truncate leading-tight">
-                        {user.title}
-                      </div>
-                    </button>
-                  );
-                })}
+            {success && (
+              <div className="p-3 rounded-lg bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex gap-2 items-start">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{success}</span>
               </div>
-            </div>
+            )}
 
-            {/* Form */}
+            {/* Sign In */}
             {activeTab === 'signin' ? (
               <form onSubmit={handleSignIn} className="space-y-4">
+
                 <Input
                   label="Work Email Address"
                   type="email"
@@ -204,25 +186,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 />
 
                 <Input
-                  label="Password / Token"
+                  label="Password"
                   type="password"
                   leftIcon={<Lock className="w-4 h-4" />}
-                  placeholder="Enter enterprise credentials"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                 />
 
                 <div className="flex items-center justify-between text-xs text-[#94A3B8]">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="rounded bg-[#0D1220] border-[#253047] text-[#6366F1] focus:ring-[#6366F1]"
-                    />
-                    <span>Remember authorization token</span>
-                  </label>
-                  <span className="text-[11px] text-[#64748B]">SAML 2.0 / Okta Ready</span>
+                  <span>Secure token-based authentication</span>
+                  <span className="text-[11px] text-[#64748B]">
+                    JWT Authentication
+                  </span>
                 </div>
 
                 <Button
@@ -237,11 +214,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </Button>
               </form>
             ) : (
+
+              /* Registration */
               <form onSubmit={handleRegister} className="space-y-4">
+
+                <Input
+                  label="Organisation Name"
+                  leftIcon={<Building2 className="w-4 h-4" />}
+                  placeholder="Enter organisation name"
+                  value={organisationName}
+                  onChange={e => setOrganisationName(e.target.value)}
+                  required
+                />
+
                 <Input
                   label="Full Name"
                   leftIcon={<User className="w-4 h-4" />}
-                  placeholder="e.g. Jordan Hayes"
+                  placeholder="Enter your full name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   required
@@ -251,29 +240,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   label="Corporate Email"
                   type="email"
                   leftIcon={<Mail className="w-4 h-4" />}
-                  placeholder="jordan.hayes@brandguard.internal"
+                  placeholder="name@organization.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Select
-                    label="Assigned Governance Role (RBAC)"
-                    options={[
-                      { value: 'creator', label: 'Creator (Draft & Submit Only)' },
-                      { value: 'reviewer', label: 'Reviewer (Governance Sign-off)' },
-                      { value: 'admin', label: 'Admin (Full Policy Authority)' },
-                    ]}
-                    value={selectedRole}
-                    onChange={e => setSelectedRole(e.target.value as UserRole)}
-                  />
-                  <Input
-                    label="Job Title / Division"
-                    placeholder="e.g. Lead Brand Strategist"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                  />
+                <Input
+                  label="Create Password"
+                  type="password"
+                  leftIcon={<Lock className="w-4 h-4" />}
+                  placeholder="Create your password"
+                  value={registrationPassword}
+                  onChange={e => setRegistrationPassword(e.target.value)}
+                  required
+                />
+
+                <div className="p-3 rounded-lg bg-[#0D1220] border border-[#6366F1]/30 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-[#6366F1]" />
+                    <span className="text-xs font-semibold text-[#F8FAFC]">
+                      Initial Account Role
+                    </span>
+                    <Badge variant="info" size="sm">Admin</Badge>
+                  </div>
+
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    The backend automatically assigns the organisation creator
+                    the Admin role. Additional role assignment is not currently
+                    part of the registration API.
+                  </p>
                 </div>
 
                 <Button
@@ -284,65 +280,81 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   isLoading={isLoading}
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Provision User & Grant Access
+                  Create Organisation Account
                 </Button>
               </form>
             )}
           </div>
 
-          {/* Right: RBAC Authorization Matrix & Security Rules (5 Cols) */}
+          {/* RBAC Information */}
           <div className="lg:col-span-5 space-y-4">
+
             <div className="bg-[#111827] border border-[#253047] rounded-xl p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-[#6366F1]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
+                <h3 className="text-sm font-semibold text-[#F8FAFC]">
                   Role-Based Access Control (RBAC)
                 </h3>
               </div>
+
               <p className="text-xs text-[#94A3B8] leading-relaxed">
-                BrandGuard AI strictly isolates duties to enforce brand integrity and legal compliance across three functional tiers:
+                BrandGuard AI separates responsibilities to support brand
+                integrity and compliance across different functional roles.
               </p>
 
-              {/* Roles Breakdown */}
               <div className="space-y-2.5 text-xs">
+
                 {/* Creator */}
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#F8FAFC]">1. Content Creator</span>
-                    <Badge variant="warning" size="sm">CREATOR</Badge>
+                    <span className="font-semibold text-[#F8FAFC]">
+                      1. Content Creator
+                    </span>
+                    <Badge variant="warning" size="sm">Creator</Badge>
                   </div>
+
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
                     Can draft copy, submit assets, and stage guideline revisions.
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#EF4444] font-mono">
+
+                  <div className="flex items-center gap-1.5 text-xs text-[#EF4444]">
                     <XCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>Cannot approve content or modify guidelines (Rule 6).</span>
+                    <span>Cannot approve content or modify guidelines.</span>
                   </div>
                 </div>
 
                 {/* Reviewer */}
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#F8FAFC]">2. Brand Reviewer</span>
-                    <Badge variant="compliant" size="sm">REVIEWER</Badge>
+                    <span className="font-semibold text-[#F8FAFC]">
+                      2. Brand Reviewer
+                    </span>
+                    <Badge variant="compliant" size="sm">Reviewer</Badge>
                   </div>
+
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
-                    Can review submissions, record approvals/rejections, and manage the triage queue.
+                    Can review submissions, record approvals/rejections, and
+                    manage the triage queue.
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#F59E0B] font-mono">
+
+                  <div className="flex items-center gap-1.5 text-xs text-[#F59E0B]">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Forbidden from approving self-authored drafts.</span>
+                    <span>Cannot approve self-authored drafts.</span>
                   </div>
                 </div>
 
                 {/* Admin */}
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#F8FAFC]">3. Brand Administrator</span>
-                    <Badge variant="info" size="sm">ADMIN</Badge>
+                    <span className="font-semibold text-[#F8FAFC]">
+                      3. Admin
+                    </span>
+                    <Badge variant="info" size="sm">Admin</Badge>
                   </div>
+
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
-                    Supervisory authority. Ratifies new guideline sources, configures SLA hours, and tunes engine sensitivity.
+                    Supervisory authority for organisation-level administration
+                    and guideline approval.
                   </div>
                 </div>
               </div>
@@ -350,9 +362,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             {/* Security Callout */}
             <div className="p-3.5 rounded-xl bg-[#0D1220] border border-[#253047] text-[11px] text-[#64748B] flex items-center justify-between">
-              <span>SOC-2 Type II Validated</span>
-              <span className="text-[#10B981] font-mono">Session Guard Active</span>
+              <span>JWT-based Authentication</span>
+              <span className="text-sm text-[#10B981]">
+                Secure Session
+              </span>
             </div>
+
           </div>
         </div>
       </div>

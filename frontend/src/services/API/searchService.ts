@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Asset, BrandSource, AuditFinding } from '../../types';
+import { Asset, BackendBrandSource, AuditFinding } from '../../types';
 
 export interface SearchResultItem {
   id: string;
@@ -22,7 +22,7 @@ export interface SearchResultItem {
 export function performGlobalSearch(
   query: string,
   assets: Asset[],
-  sources: BrandSource[],
+  sources: BackendBrandSource[],
   allFindings: Record<string, AuditFinding[]>
 ): SearchResultItem[] {
   const q = query.trim().toLowerCase();
@@ -98,47 +98,19 @@ export function performGlobalSearch(
     }
   }
 
-  // 2. Search Brand Sources (Titles, Categories, Descriptions)
+  // 2. Search Backend Brand Sources (Names and Types)
   for (const source of sources) {
-    if (source.title.toLowerCase().includes(q) || source.description.toLowerCase().includes(q)) {
+    if (source.name.toLowerCase().includes(q) || source.source_type.toLowerCase().includes(q)) {
       results.push({
         id: `src-${source.id}`,
         type: 'source',
-        title: source.title,
-        subtitle: `${source.current_version} • Category: ${source.category.replace('_', ' ').toUpperCase()} • ${source.passage_count} Passages`,
-        matchContext: source.description,
+        title: source.name,
+        subtitle: `Type: ${source.source_type.toUpperCase()} • Uploaded: ${new Date(source.created_at).toLocaleDateString()}`,
+        matchContext: `Brand Guideline Source: ${source.name} (${source.source_type})`,
         matchedField: 'Guideline Source',
-        category: source.category,
+        category: source.source_type,
         sourceId: source.id,
       });
-    }
-
-    // Search Passages inside Sources
-    for (const ver of source.versions) {
-      for (const passage of ver.passages) {
-        const textIdx = passage.text.toLowerCase().indexOf(q);
-        const titleMatch = passage.rule_title.toLowerCase().includes(q);
-        const sectionMatch = passage.section.toLowerCase().includes(q);
-
-        if (textIdx !== -1 || titleMatch || sectionMatch) {
-          let snippet = passage.text;
-          if (textIdx !== -1) {
-            const start = Math.max(0, textIdx - 30);
-            const end = Math.min(passage.text.length, textIdx + q.length + 35);
-            snippet = `...${passage.text.slice(start, end)}...`;
-          }
-
-          results.push({
-            id: `pas-${passage.id}`,
-            type: 'passage',
-            title: `${passage.rule_title} (${passage.section})`,
-            subtitle: `In ${source.title} (${source.current_version}) • Type: ${passage.rule_type.replace('_', ' ')}`,
-            matchContext: snippet,
-            matchedField: titleMatch ? 'Rule Title' : sectionMatch ? 'Rule Section' : 'Passage Text',
-            sourceId: source.id,
-          });
-        }
-      }
     }
   }
 
@@ -149,7 +121,7 @@ export function performGlobalSearch(
       const matchDesc = finding.description.toLowerCase().includes(q);
       const matchFlagged = finding.flagged_text.toLowerCase().includes(q);
       const matchReplacement = finding.suggested_replacement.toLowerCase().includes(q);
-      const matchExcerpt = finding.evidence.excerpt.toLowerCase().includes(q);
+      const matchExcerpt = finding.evidence?.excerpt?.toLowerCase().includes(q) ?? false;
 
       if (matchTitle || matchDesc || matchFlagged || matchReplacement || matchExcerpt) {
         // Find corresponding asset
@@ -159,7 +131,7 @@ export function performGlobalSearch(
           type: 'finding',
           title: `[${finding.severity.toUpperCase()}] ${finding.title}`,
           subtitle: `Flagged: "${finding.flagged_text}" ➔ Replacement: "${finding.suggested_replacement}"`,
-          matchContext: `Cited in ${finding.evidence.source_title}: "${finding.evidence.excerpt}"`,
+          matchContext: `Cited in ${finding.evidence?.source_title ?? 'Source'}: "${finding.evidence?.excerpt ?? finding.description}"`,
           matchedField: matchFlagged ? 'Flagged Phrase' : matchReplacement ? 'Replacement' : 'Finding Description',
           category: finding.category,
           severity: finding.severity,

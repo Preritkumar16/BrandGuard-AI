@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 export interface ModalProps {
@@ -25,19 +25,59 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   maxWidth = 'lg',
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (!isOpen) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      const firstFocusable = dialog?.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      );
+      (firstFocusable || dialog)?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        ) || []
+      ).filter(element => element.getClientRects().length > 0);
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+      } else if (event.shiftKey && document.activeElement === focusable[0]) {
+        event.preventDefault();
+        focusable[focusable.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+        event.preventDefault();
+        focusable[0].focus();
+      }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = '';
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -63,7 +103,10 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#161E2E] border border-[#253047] rounded-xl shadow-[0_12px_32px_-4px_rgba(0,0,0,0.65),0_4px_12px_-2px_rgba(0,0,0,0.45)] z-10 flex flex-col max-h-[90vh] overflow-hidden`}
+        aria-describedby={description ? 'modal-description' : undefined}
+        ref={dialogRef}
+        tabIndex={-1}
+        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#161E2E] border border-[#253047] rounded-lg shadow-lg z-10 flex flex-col max-h-[90vh] overflow-hidden`}
       >
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#253047] flex items-center justify-between">
@@ -72,10 +115,11 @@ export const Modal: React.FC<ModalProps> = ({
               {title}
             </h2>
             {description && (
-              <p className="text-xs text-[#94A3B8] mt-0.5">{description}</p>
+              <p id="modal-description" className="text-xs text-[#94A3B8] mt-0.5">{description}</p>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 rounded-md text-[#64748B] hover:text-[#F8FAFC] hover:bg-[#253047]/60 transition-colors cursor-pointer"
             aria-label="Close dialog"
