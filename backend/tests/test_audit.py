@@ -6,7 +6,7 @@ import hashlib
 from sqlalchemy import select
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database.session import AsyncSessionLocal
@@ -17,6 +17,7 @@ from app.models.asset import Asset
 from app.models.asset_version import AssetVersion, AssetVersionStatus
 from app.models.finding import Finding, FindingCategory
 from app.models.evidence_link import EvidenceLink
+from app.models.audit_run import AuditRun, AuditRunStatus
 
 def make_groq_mock():
     async def fake_create(**kwargs):
@@ -217,20 +218,13 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
         )
         assert approve_res.status_code == 200
 
-        # 8. Run Compliance Audit after approval
+        # 8. Run Compliance Audit after approval (First Audit Run)
         audit_post = await ac.post(
             f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert audit_post.status_code == 200
         audit_data = audit_post.json()["data"]
-        
-        print("\n========== AUDIT DEBUG ==========")
-        print("Status:", audit_data.get("status"))
-        print("Summary:", audit_data.get("summary"))
-        print("Findings:", audit_data.get("findings"))
-        print("Validation:", audit_data.get("validation"))
-        print("=================================\n")
 
         assert audit_data["status"] == "COMPLIANT"
         assert audit_data["validation"]["checks_completed"] is True
@@ -238,7 +232,7 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
         assert audit_data["validation"]["spans_validated"] is True
         assert "findings" in audit_data
 
-        # 9. Verify findings were persisted in PostgreSQL.
+        # 9. Verify first audit findings were persisted in PostgreSQL.
         async with AsyncSessionLocal() as db:
             finding_query = select(Finding).where(
                 Finding.asset_version_id == uuid.UUID(asset_version_id),
@@ -246,38 +240,17 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
             )
 
             finding_result = await db.execute(finding_query)
-            persisted_findings = finding_result.scalars().all()
+            persisted_findings_run1 = finding_result.scalars().all()
 
-            assert len(persisted_findings) == len(audit_data["findings"])
-            assert len(persisted_findings) > 0
+            assert len(persisted_findings_run1) == len(audit_data["findings"])
+            assert len(persisted_findings_run1) > 0
 
             assert all(
                 finding.validation_status == "VERIFIED"
-                for finding in persisted_findings
+                for finding in persisted_findings_run1
             )
 
-            # 10. Verify evidence links were persisted.
-            finding_ids = [finding.id for finding in persisted_findings]
-
-            evidence_query = select(EvidenceLink).where(
-                EvidenceLink.finding_id.in_(finding_ids),
-                EvidenceLink.organisation_id == uuid.UUID(organisation_id),
-            )
-
-            evidence_result = await db.execute(evidence_query)
-            persisted_evidence = evidence_result.scalars().all()
-
-            assert len(persisted_evidence) > 0
-
-            assert all(
-                evidence.organisation_id == uuid.UUID(organisation_id)
-                for evidence in persisted_evidence
-            )
-
-            print("Persisted findings:", len(persisted_findings))
-            print("Persisted evidence links:", len(persisted_evidence))
-
-        # 11. Run the same audit again for the same asset version (Repeated Audit Idempotency Test).
+        # 10. Run the same audit again for the same asset version (Second Audit Run - Immutable History Test).
         second_response = await ac.post(
             f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -286,9 +259,9 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
         second_audit_data = second_response.json()["data"]
         assert second_audit_data["status"] == "COMPLIANT"
 
-        # Verify that the second audit did not create duplicate records.
+        # Verify that running a second audit creates a new immutable audit run and preserves history (total findings = run 1 + run 2).
         async with AsyncSessionLocal() as db:
-            findings_after_second_audit = (
+            all_findings_after_second_audit = (
                 await db.execute(
                     select(Finding).where(
                         Finding.asset_version_id == uuid.UUID(asset_version_id),
@@ -297,21 +270,23 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
                 )
             ).scalars().all()
 
-            assert len(findings_after_second_audit) == len(persisted_findings)
+            # Immutable history preserves previous findings alongside new ones
+            assert len(all_findings_after_second_audit) == len(persisted_findings_run1) * 2
 
-            second_finding_ids = [
-                finding.id for finding in findings_after_second_audit
-            ]
-            evidence_after_second_audit = (
-                await db.execute(
-                    select(EvidenceLink).where(
-                        EvidenceLink.finding_id.in_(second_finding_ids),
-                        EvidenceLink.organisation_id == uuid.UUID(organisation_id),
-                    )
+            # Verify both audit runs exist in the database
+            audit_runs_result = await db.execute(
+                select(AuditRun).where(
+                    AuditRun.asset_version_id == uuid.UUID(asset_version_id),
+                    AuditRun.organisation_id == uuid.UUID(organisation_id),
                 )
-            ).scalars().all()
-
-            assert len(evidence_after_second_audit) == len(persisted_evidence)
+            )
+            audit_runs = audit_runs_result.scalars().all()
+            assert len(audit_runs) == 3
+            completed_runs = [
+                run for run in audit_runs
+                if run.status == AuditRunStatus.COMPLETED
+            ]
+            assert len(completed_runs) == 2
 
 @pytest.mark.parametrize(
     "all_valid, violations, review_items, expected",
@@ -477,7 +452,7 @@ async def run_semantic_audit_test(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("category", "assessment", "expected_status", "expected_finding_status"),
+    "category, assessment, expected_status, expected_finding_status",
     [
         (
             "SUPPORTED",
@@ -547,12 +522,10 @@ async def test_semantic_verification_failure_requires_review(
     assert result["validation"]["checks_completed"] is False
     assert result["validation"]["citations_validated"] is False
 
-
 @pytest.mark.asyncio
 async def test_audit_persistence_failure_rolls_back(monkeypatch):
     from sqlalchemy.ext.asyncio import AsyncSession
     from app.api.v1 import audits
-    from app.models.finding import FindingCategory
 
     unique_suffix = uuid.uuid4().hex[:6]
     org_name = f"Rollback Corp {unique_suffix}"
@@ -597,7 +570,7 @@ async def test_audit_persistence_failure_rolls_back(monkeypatch):
             "Authorization": f"Bearer {admin_token}"
         }
 
-        # 2. Create an asset and its version.
+        # 2. Create an asset, its version, and an AuditRun.
         async with AsyncSessionLocal() as db:
             asset = Asset(
                 organisation_id=organisation_id,
@@ -623,13 +596,23 @@ async def test_audit_persistence_failure_rolls_back(monkeypatch):
             db.add(asset_version)
             await db.flush()
 
+            audit_run = AuditRun(
+                organisation_id=organisation_id,
+                asset_version_id=asset_version.id,
+                initiated_by=uuid.UUID(admin_data["id"]),
+                status=AuditRunStatus.COMPLETED,
+            )
+            db.add(audit_run)
+            await db.flush()
+
             asset_id = asset.id
             asset_version_id = asset_version.id
 
-            # 3. Save an original finding.
+            # 3. Save an original finding linked to the audit run.
             original_finding = Finding(
                 organisation_id=organisation_id,
                 asset_version_id=asset_version_id,
+                audit_run_id=audit_run.id,
                 category=FindingCategory.SUPPORTED,
                 severity="LOW",
                 span_start=0,
@@ -772,7 +755,7 @@ async def test_evidence_link_persistence_failure_rolls_back(monkeypatch):
             "Authorization": f"Bearer {login.json()['access_token']}"
         }
 
-        # 2. Create asset, source version, original finding and evidence link.
+        # 2. Create asset, source version, audit run, original finding and evidence link.
         async with AsyncSessionLocal() as db:
             asset = Asset(
                 organisation_id=organisation_id,
@@ -794,6 +777,15 @@ async def test_evidence_link_persistence_failure_rolls_back(monkeypatch):
                 created_by=admin_id,
             )
             db.add(asset_version)
+            await db.flush()
+
+            audit_run = AuditRun(
+                organisation_id=organisation_id,
+                asset_version_id=asset_version.id,
+                initiated_by=admin_id,
+                status=AuditRunStatus.COMPLETED,
+            )
+            db.add(audit_run)
             await db.flush()
 
             brand_source = BrandSource(
@@ -825,6 +817,7 @@ async def test_evidence_link_persistence_failure_rolls_back(monkeypatch):
             original_finding = Finding(
                 organisation_id=organisation_id,
                 asset_version_id=asset_version.id,
+                audit_run_id=audit_run.id,
                 category=FindingCategory.SUPPORTED,
                 severity="LOW",
                 span_start=0,

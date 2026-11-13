@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.organisation import Organisation
     from app.models.asset_version import AssetVersion
     from app.models.evidence_link import EvidenceLink
+    from app.models.audit_run import AuditRun
 
 
 class FindingCategory(str, enum.Enum):
@@ -37,6 +38,9 @@ class Finding(Base):
     )
     asset_version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
+    )
+    audit_run_id: Mapped[uuid.UUID] = mapped_column(
+    UUID(as_uuid=True),nullable=False, index=True,
     )
     category: Mapped[FindingCategory] = mapped_column(
         SQLEnum(FindingCategory, native_enum=False, values_callable=lambda x: [e.value for e in x]),
@@ -69,6 +73,17 @@ class Finding(Base):
         foreign_keys=[asset_version_id, organisation_id],
         overlaps="organisation",
     )
+    audit_run: Mapped["AuditRun"] = relationship(
+    "AuditRun",
+    primaryjoin=(
+        "and_("
+        "Finding.audit_run_id == AuditRun.id, "
+        "Finding.organisation_id == AuditRun.organisation_id"
+        ")"
+    ),
+    foreign_keys=[audit_run_id, organisation_id],
+    viewonly=True,
+    )
     evidence_links: Mapped[List["EvidenceLink"]] = relationship(
         "EvidenceLink", back_populates="finding", cascade="all, delete-orphan"
     )
@@ -80,6 +95,12 @@ class Finding(Base):
             ["asset_version_id", "organisation_id"],
             ["asset_versions.id", "asset_versions.organisation_id"],
             name="fk_finding_asset_version_tenant",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["audit_run_id", "organisation_id"],
+            ["audit_runs.id", "audit_runs.organisation_id"],
+            name="fk_finding_audit_run_tenant",
             ondelete="CASCADE",
         ),
     )
