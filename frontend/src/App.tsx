@@ -22,7 +22,7 @@ import { NotificationsDrawer, NotificationItem } from './components/common/Notif
 import { PolicyRulesModal } from './components/common/PolicyRulesModal';
 import { Modal } from './components/UI/Modal';
 import { Input } from './components/UI/Input';
-import { Asset, BrandSource, ReviewQueueItem, User } from './types';
+import { Asset, BackendBrandSource, ReviewQueueItem, User } from './types';
 import { authService } from './services/API/authService';
 import { assetsService, canCreatorOpenAssetDetails, isAssetOwnedBy } from './services/API/assetsService';
 import { sourcesService } from './services/API/sourcesService';
@@ -31,7 +31,6 @@ import { auditService } from './services/API/auditService';
 import { performGlobalSearch } from './services/API/searchService';
 import { Search, FileText, BookOpen, AlertCircle } from 'lucide-react';
 import { AppScreen, NavItem, navigationFor, screenLabel } from './config/navigation';
-
 
 // Tabs used by the main application content.
 type NavTab =
@@ -80,9 +79,9 @@ function getScreenForTab(tab: NavTab, role: User['role']): AppScreen {
   }
 }
 
-
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authService.isAuthenticated());
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authReady, setAuthReady] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('asset-sentinel-launch');
   const [allowCreatorSubmissionAccess, setAllowCreatorSubmissionAccess] = useState(false);
@@ -91,8 +90,8 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
-  // User state (RBAC session)
-  const [currentUser, setCurrentUser] = useState<User>(authService.getCurrentUserSync());
+  // User state (RBAC session) - nullable until verified
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Data states
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -100,7 +99,7 @@ export default function App() {
     message: string;
     tone: 'info' | 'warning';
   } | null>(null);
-  const [sources, setSources] = useState<BrandSource[]>([]);
+  const [sources, setSources] = useState<BackendBrandSource[]>([]);
   const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -114,7 +113,7 @@ export default function App() {
 
   // Search Engine state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchTypeFilter, setSearchTypeFilter] = useState<'all' | 'asset' | 'passage' | 'finding'>('all');
+  const [searchTypeFilter, setSearchTypeFilter] = useState<'all' | 'asset' | 'source' | 'finding'>('all');
 
   // Notifications State
   const [notifications, setNotifications] = useState<NotificationItem[]>([
@@ -147,10 +146,49 @@ export default function App() {
     },
   ]);
 
-  // Initial Data Load
+  // Restore and validate an existing session on application startup.
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        if (!authService.isAuthenticated()) {
+          return;
+        }
+
+        const user = await authService.getMe();
+
+        if (!cancelled) {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.warn('Session validation failed:', error);
+
+        await authService.logout();
+
+        if (!cancelled) {
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthReady(true);
+        }
+      }
+    };
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Data Loading function (excludes getMe)
   const refreshAllData = async () => {
     try {
-      const userData = await authService.getMe();
+      setIsLoading(true);
       const [assetsData, sourcesData, queueData] = await Promise.all([
         assetsService.getAssets(),
         sourcesService.getSources(),
@@ -159,15 +197,19 @@ export default function App() {
       setAssets(assetsData);
       setSources(sourcesData);
       setQueue(queueData);
-      setCurrentUser(userData);
+    } catch (error) {
+      console.error('Failed to load application data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load application data only after successful authentication.
   useEffect(() => {
     if (isAuthenticated) {
-      refreshAllData();
+      void refreshAllData();
+    } else {
+      setIsLoading(false);
     }
   }, [isAuthenticated]);
 
@@ -182,6 +224,28 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Wait until the stored session has been validated.
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center text-sm text-[#94A3B8]">
+        Validating BrandGuard AI session...
+      </div>
+    );
+  }
+
+  // No valid session: show the login page.
+  if (!isAuthenticated || !currentUser) {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          setCurrentTab('dashboard');
+        }}
+      />
+    );
+  }
 
   // Compute Breadcrumb items
   const getBreadcrumbs = (): BreadcrumbItem[] => {
@@ -239,26 +303,21 @@ export default function App() {
     setCurrentTab('sources');
   };
 
-  const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    refreshAllData();
-  };
-
   const handleLogout = async () => {
     await authService.logout();
+    setCurrentUser(null);
     setIsAuthenticated(false);
+    setAuthReady(true);
+    setAssets([]);
+    setSources([]);
+    setQueue([]);
+    setCurrentTab('dashboard');
   };
 
   const openNewAssetModal = () => {
     setCreatorSubmissionNotice(null);
     setNewAssetModalOpen(true);
   };
-
-  // If user is not authenticated, render dedicated enterprise LoginPage
-  if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
 
   // Execute deep global search
   const visibleAssets = currentUser.role === 'creator'
@@ -278,7 +337,7 @@ export default function App() {
   const filteredSearchResults = searchResults.filter(item => {
     if (searchTypeFilter === 'all') return true;
     if (searchTypeFilter === 'asset') return item.type === 'asset';
-    if (searchTypeFilter === 'passage') return item.type === 'passage' || item.type === 'source';
+    if (searchTypeFilter === 'source') return item.type === 'source';
     if (searchTypeFilter === 'finding') return item.type === 'finding';
     return true;
   });
@@ -458,9 +517,9 @@ export default function App() {
             ? auditServerOutcome === 'unknown'
               ? 'The server audit outcome is unconfirmed; your submission was saved.'
               : 'The server rejected the initial brand check; your submission was saved.'
-            : auditSource === 'local'
-              ? 'The server audit outcome is unconfirmed. A separate local rule check ran; it is not a server or AI result.'
-              : 'The server brand check completed.';
+            : auditSource === 'unavailable'
+              ? 'AI audit is unavailable. No successful server audit result was returned.'
+              : 'Audit completed.';
           setCreatorSubmissionNotice({
             message: `The API accepted your submission. ${auditMessage}`,
             tone: auditUnavailable || auditServerOutcome === 'unknown' ? 'warning' : 'info',
@@ -556,14 +615,14 @@ export default function App() {
               Assets & Copy ({searchResults.filter(r => r.type === 'asset').length})
             </button>
             <button
-              onClick={() => setSearchTypeFilter('passage')}
+              onClick={() => setSearchTypeFilter('source')}
               className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer ${
-                searchTypeFilter === 'passage'
+                searchTypeFilter === 'source'
                   ? 'bg-[#161E2E] text-[#F8FAFC] border border-[#253047]'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
               }`}
             >
-              Guidelines & Passages ({searchResults.filter(r => r.type === 'passage' || r.type === 'source').length})
+              Brand Sources ({searchResults.filter(r => r.type === 'source').length})
             </button>
             <button
               onClick={() => setSearchTypeFilter('finding')}
@@ -595,7 +654,7 @@ export default function App() {
                     setSearchModalOpen(false);
                     setSearchQuery('');
                     if (item.assetId && currentUser.role !== 'creator') {
-                    handleSelectAsset(item.assetId);
+                      handleSelectAsset(item.assetId);
                     } else if (item.sourceId) {
                       setSelectedSourceId(item.sourceId);
                       setCurrentTab('sources');

@@ -50,6 +50,7 @@ export type ComplianceStatus =
   | 'in_review'
   | 'approved'
   | 'rejected'
+  | 'compliant'
   | 'review_required'
   | 'breach'
   | 'failed'
@@ -90,14 +91,31 @@ export interface BrandSource {
   updated_at: string;
 }
 
+// Backend-aligned brand source interface added for API compliance
+export interface BackendBrandSource {
+  id: string;
+  organisation_id: string;
+  name: string;
+  source_type: string;
+  owner_user_id: string;
+  current_version_id: string;
+  created_at: string;
+}
+
 export interface EvidenceReference {
-  source_id: string;
-  source_title: string;
-  source_version: string;
+  source_id?: string;
+  source_title?: string;
+  source_version?: string;
+  source_version_id?: string;
   passage_id: string;
-  section: string;
+  section?: string;
   excerpt: string;
-  match_confidence: number; // e.g. 0.96 (96%)
+  match_confidence?: number;
+}
+
+export interface BackendEvidenceReference {
+  source_version_id: string;
+  passage_id: string;
 }
 
 export interface AuditFinding {
@@ -109,8 +127,11 @@ export interface AuditFinding {
   description: string;
   flagged_text: string;
   suggested_replacement: string;
-  evidence: EvidenceReference;
+  suggested_action?: string;
+  evidence?: EvidenceReference;
+  evidence_references?: BackendEvidenceReference[];
   status: 'open' | 'accepted' | 'dismissed';
+  validation_status?: 'VERIFIED' | 'UNVERIFIED';
 }
 
 export interface ReviewDecision {

@@ -1,14 +1,11 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * Centralized API client configured for FastAPI backend (/api/v1).
- * Network failures use status 0 so services can distinguish an unknown outcome from a rejection.
- */
-
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+export const AUTH_TOKEN_KEY = 'bg_access_token';
 
 export interface ApiResponse<T> {
   data: T;
@@ -25,9 +22,10 @@ export class ApiError extends Error {
     message: string,
     status: number,
     details?: unknown,
-    outcome: 'rejected' | 'unknown' = status === 0 || status === 408 || status >= 500
-      ? 'unknown'
-      : 'rejected'
+    outcome: 'rejected' | 'unknown' =
+      status === 0 || status === 408 || status >= 500
+        ? 'unknown'
+        : 'rejected'
   ) {
     super(message);
     this.name = 'ApiError';
@@ -43,12 +41,29 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
+  const headers = new Headers(options.headers);
+
+  // Attach the backend JWT when a real session exists.
+  try {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  } catch {
+    // Storage may be unavailable in restricted browser environments.
+  }
+
+  // Do not set JSON content type for multipart FormData uploads.
+  if (
+    options.body !== undefined &&
+    !(options.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   let response: Response;
+
   try {
     response = await fetch(url, {
       ...options,
@@ -63,6 +78,7 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     let errorBody: unknown;
+
     try {
       errorBody = await response.json();
     } catch {
@@ -72,11 +88,16 @@ export async function apiFetch<T>(
         errorBody = undefined;
       }
     }
+
     throw new ApiError(
       `API request failed: ${response.status} ${response.statusText}`,
       response.status,
       errorBody
     );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   try {

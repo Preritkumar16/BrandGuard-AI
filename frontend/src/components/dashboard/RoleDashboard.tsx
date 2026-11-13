@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Asset, AuditFinding, BrandSource, ReviewDecision, ReviewQueueItem, User } from '../../types';
+import { Asset, AuditFinding, BackendBrandSource, ReviewDecision, ReviewQueueItem, User } from '../../types';
 import { ROLE_META, roleLabel } from '../../config/roles';
 import { authService } from '../../services/API/authService';
 import { auditService } from '../../services/API/auditService';
@@ -20,7 +20,7 @@ interface DashboardProps {
     message: string;
     tone: 'info' | 'warning';
   } | null;
-  sources: BrandSource[];
+  sources: BackendBrandSource[];
   queue: ReviewQueueItem[];
   currentUser: User;
   onSelectAsset: (assetId: string) => void;
@@ -74,7 +74,7 @@ function decisionEvents(assets: Asset[]): DecisionEvent[] {
   )).sort((a, b) => dateValue(b.decision.timestamp) - dateValue(a.decision.timestamp));
 }
 
-function organisationActivity(assets: Asset[], sources: BrandSource[]): ActivityItem[] {
+function organisationActivity(assets: Asset[], sources: BackendBrandSource[]): ActivityItem[] {
   return [
     ...assets.map(asset => ({
       id: `asset-${asset.id}`,
@@ -86,9 +86,8 @@ function organisationActivity(assets: Asset[], sources: BrandSource[]): Activity
     ...sources.map(source => ({
       id: `source-${source.id}`,
       type: 'Brand source updated',
-      title: source.title,
-      date: source.updated_at,
-      status: source.status,
+      title: source.name,
+      date: source.created_at,
     })),
   ].sort((a, b) => dateValue(b.date) - dateValue(a.date)).slice(0, 5);
 }
@@ -245,7 +244,7 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
     <DashboardPage
       title="My submissions"
       description="Track your content status and the latest available brand-check results."
-      actions={      <Button size="sm" className="shadow-sm" onClick={onNewAssetClick}>Submit Content</Button>}
+      actions={<Button size="sm" className="shadow-sm" onClick={onNewAssetClick}>Submit Content</Button>}
     >
       {creatorSubmissionNotice && (
         <div
@@ -340,12 +339,14 @@ const CreatorDashboard: React.FC<DashboardProps> = props => {
 
 const BrandManagerDashboard: React.FC<DashboardProps> = props => {
   const { assets, sources, onNavigateToSources, onNavigateToAssets, onSelectAsset } = props;
-  const updatedSources = [...sources].sort((a, b) => dateValue(b.updated_at) - dateValue(a.updated_at)).slice(0, 5);
+  const recentSources = [...sources]
+    .sort((a, b) => dateValue(b.created_at) - dateValue(a.created_at))
+    .slice(0, 5);
   const approvedAssets = [...assets]
     .filter(asset => asset.current_status === 'approved')
     .sort((a, b) => dateValue(b.updated_at) - dateValue(a.updated_at))
     .slice(0, 5);
-  const approvedSources = sources.filter(source => source.status === 'approved').length;
+  const sourceTypes = new Set(sources.map(source => source.source_type)).size;
 
   return (
     <DashboardPage
@@ -364,23 +365,36 @@ const BrandManagerDashboard: React.FC<DashboardProps> = props => {
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Brand sources" value={sources.length} tone="info" />
-        <StatCard label="Approved sources" value={approvedSources} tone="good" />
+        <StatCard label="Source types" value={sourceTypes} tone="info" />
         <StatCard label="Approved assets" value={assets.filter(asset => asset.current_status === 'approved').length} tone="good" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <DashboardSection title="Recent source updates" action={<Button variant="ghost" size="sm" onClick={() => onNavigateToSources()}>View all</Button>}>
-          {updatedSources.length === 0 ? (
+        <DashboardSection
+          title="Recent source uploads"
+          action={
+            <Button variant="ghost" size="sm" onClick={() => onNavigateToSources()}>
+              View all
+            </Button>
+          }
+        >
+          {recentSources.length === 0 ? (
             <EmptyState>No brand sources are available.</EmptyState>
           ) : (
             <ul className="divide-y divide-[#DCE2E9]">
-              {updatedSources.map(source => (
-                <li key={source.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+              {recentSources.map(source => (
+                <li
+                  key={source.id}
+                  className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0"
+                >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[#1B2533]">{source.title}</p>
-                    <p className="text-xs text-[#5C6878]">{source.current_version} · Updated {formatDate(source.updated_at)}</p>
+                    <p className="truncate text-sm font-medium text-[#1B2533]">
+                      {source.name}
+                    </p>
+                    <p className="text-xs text-[#5C6878]">
+                      {source.source_type} · Uploaded {formatDate(source.created_at)}
+                    </p>
                   </div>
-                  <Badge status={source.status} size="sm" />
                 </li>
               ))}
             </ul>
@@ -565,9 +579,9 @@ const ComplianceDashboard: React.FC<DashboardProps> = ({ assets, onNavigateToAud
                     <Badge status={finding.severity} size="sm" />
                   </div>
                   <p className="mt-1 text-xs text-[#4B5869]">
-                    {finding.evidence.source_title} · {finding.evidence.source_version} · {finding.evidence.section}
+                    {finding.evidence?.source_title ?? 'Source'} · {finding.evidence?.source_version ?? 'v1'} · {finding.evidence?.section ?? 'General'}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-[#5C6878]">{finding.evidence.excerpt}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-[#5C6878]">{finding.evidence?.excerpt ?? finding.description}</p>
                   <p className="mt-1 text-xs text-[#5C6878]">Finding status: {finding.status}</p>
                 </li>
               ))}

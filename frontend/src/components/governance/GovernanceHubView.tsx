@@ -30,7 +30,7 @@ import {
   X,
   FileText,
 } from 'lucide-react';
-import { BrandSource, User } from '../../types';
+import { BackendBrandSource, User } from '../../types';
 import { Button } from '../UI/Button';
 import { Badge } from '../UI/Badge';
 import { Card } from '../UI/Card';
@@ -42,7 +42,7 @@ import {
 } from '../../services/API/governanceService';
 
 interface GovernanceHubViewProps {
-  sources: BrandSource[];
+  sources: BackendBrandSource[];
   currentUser: User;
   onNavigateToSources: (category?: string) => void;
   onSelectAsset?: (assetId: string) => void;
@@ -77,7 +77,6 @@ export const GovernanceHubView: React.FC<GovernanceHubViewProps> = ({
     governanceService.verifyApprovalIntegrity('appr-sec-9941a8').then(setVerificationResult);
   }, []);
 
-  const totalPassages = sources.reduce((acc, s) => acc + (s.passage_count || 0), 0);
   const pendingReAudits = reviewRequiredList.filter(r => r.status === 'pending_re_audit').length;
   const reAuditedCount = reviewRequiredList.filter(r => r.status === 're_audited').length;
 
