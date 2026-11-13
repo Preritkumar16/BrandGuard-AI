@@ -2,14 +2,21 @@ import uuid
 import pytest
 import json
 import re
+import hashlib
+from sqlalchemy import select
+
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database.session import AsyncSessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.services.audit_service import _determine_compliance_status
+from app.models.asset import Asset
+from app.models.asset_version import AssetVersion, AssetVersionStatus
+from app.models.finding import Finding, FindingCategory
+from app.models.evidence_link import EvidenceLink
 
 def make_groq_mock():
     async def fake_create(**kwargs):
@@ -142,16 +149,41 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
         source_id = source_data["id"]
         version_id = source_data["current_version_id"]
 
+        # Create a marketing asset and its first version
+        asset_content = "We love our official Navy Blue #000080 branding!"
+        async with AsyncSessionLocal() as db:
+            asset = Asset(
+                organisation_id=uuid.UUID(organisation_id),
+                title="Brand Campaign",
+                created_by=uuid.UUID(admin_user_data["id"]),
+            )
+            db.add(asset)
+            await db.flush()
+            asset_version = AssetVersion(
+                organisation_id=uuid.UUID(organisation_id),
+                asset_id=asset.id,
+                version_number=1,
+                content_hash=hashlib.sha256(
+                    asset_content.encode("utf-8")
+                ).hexdigest(),
+                content_text=asset_content,
+                status=AssetVersionStatus.DRAFT,
+                created_by=uuid.UUID(admin_user_data["id"]),
+            )
+            db.add(asset_version)
+            await db.commit()
+            asset_id = str(asset.id)
+            asset_version_id = str(asset_version.id)
+
         # 4. Audit before approval should return UNAVAILABLE (no approved guidelines indexed)
         audit_pre = await ac.post(
-            "/api/v1/audit/",
-            json={"asset_content": "Check out our new neon green header style!"},
-            headers={"Authorization": f"Bearer {admin_token}"}
+            f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert audit_pre.status_code == 200
-        assert audit_pre.json()["status"] == "UNAVAILABLE"
+        assert audit_pre.json()["data"]["status"] == "UNAVAILABLE"
 
-        # 5. Create Reviewer in the SAME organisation directly via DB (since public registration creates an initial ADMIN per tenant)
+        # 5. Create Reviewer in the SAME organisation directly via DB
         reviewer = User(
             organisation_id=uuid.UUID(organisation_id),
             name="Reviewer Audit",
@@ -187,12 +219,11 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
 
         # 8. Run Compliance Audit after approval
         audit_post = await ac.post(
-            "/api/v1/audit/",
-            json={"asset_content": "We love our official Navy Blue #000080 branding!"},
-            headers={"Authorization": f"Bearer {admin_token}"}
+            f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert audit_post.status_code == 200
-        audit_data = audit_post.json()
+        audit_data = audit_post.json()["data"]
         
         print("\n========== AUDIT DEBUG ==========")
         print("Status:", audit_data.get("status"))
@@ -206,6 +237,81 @@ async def test_end_to_end_compliance_audit_workflow(monkeypatch):
         assert audit_data["validation"]["citations_validated"] is True
         assert audit_data["validation"]["spans_validated"] is True
         assert "findings" in audit_data
+
+        # 9. Verify findings were persisted in PostgreSQL.
+        async with AsyncSessionLocal() as db:
+            finding_query = select(Finding).where(
+                Finding.asset_version_id == uuid.UUID(asset_version_id),
+                Finding.organisation_id == uuid.UUID(organisation_id),
+            )
+
+            finding_result = await db.execute(finding_query)
+            persisted_findings = finding_result.scalars().all()
+
+            assert len(persisted_findings) == len(audit_data["findings"])
+            assert len(persisted_findings) > 0
+
+            assert all(
+                finding.validation_status == "VERIFIED"
+                for finding in persisted_findings
+            )
+
+            # 10. Verify evidence links were persisted.
+            finding_ids = [finding.id for finding in persisted_findings]
+
+            evidence_query = select(EvidenceLink).where(
+                EvidenceLink.finding_id.in_(finding_ids),
+                EvidenceLink.organisation_id == uuid.UUID(organisation_id),
+            )
+
+            evidence_result = await db.execute(evidence_query)
+            persisted_evidence = evidence_result.scalars().all()
+
+            assert len(persisted_evidence) > 0
+
+            assert all(
+                evidence.organisation_id == uuid.UUID(organisation_id)
+                for evidence in persisted_evidence
+            )
+
+            print("Persisted findings:", len(persisted_findings))
+            print("Persisted evidence links:", len(persisted_evidence))
+
+        # 11. Run the same audit again for the same asset version (Repeated Audit Idempotency Test).
+        second_response = await ac.post(
+            f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert second_response.status_code == 200
+        second_audit_data = second_response.json()["data"]
+        assert second_audit_data["status"] == "COMPLIANT"
+
+        # Verify that the second audit did not create duplicate records.
+        async with AsyncSessionLocal() as db:
+            findings_after_second_audit = (
+                await db.execute(
+                    select(Finding).where(
+                        Finding.asset_version_id == uuid.UUID(asset_version_id),
+                        Finding.organisation_id == uuid.UUID(organisation_id),
+                    )
+                )
+            ).scalars().all()
+
+            assert len(findings_after_second_audit) == len(persisted_findings)
+
+            second_finding_ids = [
+                finding.id for finding in findings_after_second_audit
+            ]
+            evidence_after_second_audit = (
+                await db.execute(
+                    select(EvidenceLink).where(
+                        EvidenceLink.finding_id.in_(second_finding_ids),
+                        EvidenceLink.organisation_id == uuid.UUID(organisation_id),
+                    )
+                )
+            ).scalars().all()
+
+            assert len(evidence_after_second_audit) == len(persisted_evidence)
 
 @pytest.mark.parametrize(
     "all_valid, violations, review_items, expected",
@@ -440,3 +546,424 @@ async def test_semantic_verification_failure_requires_review(
     assert result["validation"]["spans_validated"] is True
     assert result["validation"]["checks_completed"] is False
     assert result["validation"]["citations_validated"] is False
+
+
+@pytest.mark.asyncio
+async def test_audit_persistence_failure_rolls_back(monkeypatch):
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.api.v1 import audits
+    from app.models.finding import FindingCategory
+
+    unique_suffix = uuid.uuid4().hex[:6]
+    org_name = f"Rollback Corp {unique_suffix}"
+    admin_email = f"rollback_{unique_suffix}@governance.com"
+
+    # 1. Register and log in as admin.
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as ac:
+
+        reg_admin = await ac.post(
+            "/api/v1/auth/register",
+            json={
+                "organisation_name": org_name,
+                "name": "Admin Rollback",
+                "email": admin_email,
+                "password": "securepassword123",
+            },
+        )
+
+        assert reg_admin.status_code == 201
+
+        admin_data = reg_admin.json()
+        organisation_id = uuid.UUID(admin_data["organisation_id"])
+
+        login_admin = await ac.post(
+            "/api/v1/auth/login",
+            json={
+                "email": admin_email,
+                "password": "securepassword123",
+            },
+        )
+
+        assert login_admin.status_code == 200
+
+        admin_token = login_admin.json()["access_token"]
+
+        headers = {
+            "Authorization": f"Bearer {admin_token}"
+        }
+
+        # 2. Create an asset and its version.
+        async with AsyncSessionLocal() as db:
+            asset = Asset(
+                organisation_id=organisation_id,
+                title="Rollback Campaign",
+                created_by=uuid.UUID(admin_data["id"]),
+            )
+
+            db.add(asset)
+            await db.flush()
+
+            asset_version = AssetVersion(
+                organisation_id=organisation_id,
+                asset_id=asset.id,
+                version_number=1,
+                content_hash=hashlib.sha256(
+                    b"Rollback test content"
+                ).hexdigest(),
+                content_text="Test asset content for rollback.",
+                status=AssetVersionStatus.DRAFT,
+                created_by=uuid.UUID(admin_data["id"]),
+            )
+
+            db.add(asset_version)
+            await db.flush()
+
+            asset_id = asset.id
+            asset_version_id = asset_version.id
+
+            # 3. Save an original finding.
+            original_finding = Finding(
+                organisation_id=organisation_id,
+                asset_version_id=asset_version_id,
+                category=FindingCategory.SUPPORTED,
+                severity="LOW",
+                span_start=0,
+                span_end=4,
+                span_text="Test",
+                explanation="Original finding before rollback.",
+                suggested_action="No action required.",
+                suggested_replacement=None,
+                validation_status="VERIFIED",
+                model_name="test-model",
+                prompt_version="rollback-test-v1",
+            )
+
+            db.add(original_finding)
+            await db.commit()
+
+            original_finding_id = original_finding.id
+
+        # 4. Mock audit evaluation with a persistable result.
+        mocked_audit_result = {
+            "status": "COMPLIANT",
+            "summary": "Mock audit for rollback testing.",
+            "findings": [
+                {
+                    "category": "SUPPORTED",
+                    "severity": "LOW",
+                    "span": {
+                        "start": 0,
+                        "end": 4,
+                        "text": "Test",
+                    },
+                    "explanation": "Replacement finding.",
+                    "suggested_action": "No action required.",
+                    "suggested_replacement": None,
+                    "validation_status": "VERIFIED",
+                    "evidence": [],
+                }
+            ],
+            "evidence_used": [],
+            "model_name": "test-model",
+            "prompt_version": "rollback-test-v1",
+            "validation": {
+                "citations_validated": True,
+                "spans_validated": True,
+                "checks_completed": True,
+            },
+        }
+
+        monkeypatch.setattr(
+            audits,
+            "evaluate_asset_compliance",
+            AsyncMock(return_value=mocked_audit_result),
+        )
+
+        # 5. Simulate a failure during the final database commit.
+        async def mock_fail_commit(self):
+            raise RuntimeError(
+                "Simulated database commit failure"
+            )
+
+        monkeypatch.setattr(
+            AsyncSession,
+            "commit",
+            mock_fail_commit,
+        )
+
+        # 6. Call the audit endpoint.
+        response = await ac.post(
+            f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
+            headers=headers,
+        )
+
+        assert response.status_code == 500
+
+        # 7. Verify rollback preserved the original finding.
+        async with AsyncSessionLocal() as db:
+            findings_after_failure = (
+                await db.execute(
+                    select(Finding).where(
+                        Finding.asset_version_id == asset_version_id,
+                        Finding.organisation_id == organisation_id,
+                    )
+                )
+            ).scalars().all()
+
+        assert len(findings_after_failure) == 1
+
+        assert (
+            findings_after_failure[0].id
+            == original_finding_id
+        )
+
+        assert (
+            findings_after_failure[0].explanation
+            == "Original finding before rollback."
+        )
+
+        print("Simulated commit failure: PASSED")
+        print("API error response: HTTP", response.status_code)
+        print("Original finding preserved: PASSED")
+        print("Partial replacement findings: 0")
+
+
+@pytest.mark.asyncio
+async def test_evidence_link_persistence_failure_rolls_back(monkeypatch):
+    from datetime import date
+    from sqlalchemy.orm import Session
+    from sqlalchemy import event
+    from app.api.v1 import audits
+    from app.models.brand_source import BrandSource
+    from app.models.source_version import SourceVersion, SourceStatus
+
+    unique_suffix = uuid.uuid4().hex[:6]
+    org_name = f"Evidence Rollback {unique_suffix}"
+    admin_email = f"evidence_{unique_suffix}@governance.com"
+
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # 1. Create organisation and admin.
+        register = await ac.post("/api/v1/auth/register", json={
+            "organisation_name": org_name,
+            "name": "Evidence Rollback Admin",
+            "email": admin_email,
+            "password": "securepassword123",
+        })
+        assert register.status_code == 201
+
+        admin_data = register.json()
+        organisation_id = uuid.UUID(admin_data["organisation_id"])
+        admin_id = uuid.UUID(admin_data["id"])
+
+        login = await ac.post("/api/v1/auth/login", json={
+            "email": admin_email,
+            "password": "securepassword123",
+        })
+        assert login.status_code == 200
+
+        headers = {
+            "Authorization": f"Bearer {login.json()['access_token']}"
+        }
+
+        # 2. Create asset, source version, original finding and evidence link.
+        async with AsyncSessionLocal() as db:
+            asset = Asset(
+                organisation_id=organisation_id,
+                title="Evidence Rollback Campaign",
+                created_by=admin_id,
+            )
+            db.add(asset)
+            await db.flush()
+
+            asset_version = AssetVersion(
+                organisation_id=organisation_id,
+                asset_id=asset.id,
+                version_number=1,
+                content_hash=hashlib.sha256(
+                    b"Evidence rollback content"
+                ).hexdigest(),
+                content_text="Test asset content for evidence rollback.",
+                status=AssetVersionStatus.DRAFT,
+                created_by=admin_id,
+            )
+            db.add(asset_version)
+            await db.flush()
+
+            brand_source = BrandSource(
+                organisation_id=organisation_id,
+                name="Rollback Test Guidelines",
+                source_type="GUIDELINE",
+                owner_user_id=admin_id,
+            )
+            db.add(brand_source)
+            await db.flush()
+
+            source_version = SourceVersion(
+                organisation_id=organisation_id,
+                source_id=brand_source.id,
+                version_number=1,
+                effective_from=date.today(),
+                effective_to=None,
+                status=SourceStatus.APPROVED,
+                file_object_key=f"rollback-test-{unique_suffix}",
+                content_hash=hashlib.sha256(
+                    b"Approved guideline content"
+                ).hexdigest(),
+                created_by=admin_id,
+                approved_by=admin_id,
+            )
+            db.add(source_version)
+            await db.flush()
+
+            original_finding = Finding(
+                organisation_id=organisation_id,
+                asset_version_id=asset_version.id,
+                category=FindingCategory.SUPPORTED,
+                severity="LOW",
+                span_start=0,
+                span_end=4,
+                span_text="Test",
+                explanation="Original finding before evidence failure.",
+                suggested_action="No action required.",
+                validation_status="VERIFIED",
+                model_name="test-model",
+                prompt_version="evidence-rollback-v1",
+            )
+            db.add(original_finding)
+            await db.flush()
+
+            original_link = EvidenceLink(
+                organisation_id=organisation_id,
+                finding_id=original_finding.id,
+                source_version_id=source_version.id,
+                passage_id="original-passage",
+            )
+            db.add(original_link)
+
+            await db.commit()
+
+            asset_id = asset.id
+            asset_version_id = asset_version.id
+            source_version_id = source_version.id
+            original_finding_id = original_finding.id
+            original_link_id = original_link.id
+
+        # 3. Mock an audit that produces a replacement finding and link.
+        evidence_item = {
+            "source_version_id": str(source_version_id),
+            "passage_id": "replacement-passage",
+        }
+
+        mocked_audit_result = {
+            "status": "COMPLIANT",
+            "summary": "Mock audit for evidence rollback.",
+            "findings": [{
+                "category": "SUPPORTED",
+                "severity": "LOW",
+                "span": {
+                    "start": 0,
+                    "end": 4,
+                    "text": "Test",
+                },
+                "explanation": "Replacement finding.",
+                "suggested_action": "No action required.",
+                "suggested_replacement": None,
+                "validation_status": "VERIFIED",
+                "evidence": [evidence_item],
+            }],
+            "evidence_used": [evidence_item],
+            "model_name": "test-model",
+            "prompt_version": "evidence-rollback-v1",
+            "validation": {
+                "citations_validated": True,
+                "spans_validated": True,
+                "checks_completed": True,
+            },
+        }
+
+        monkeypatch.setattr(
+            audits,
+            "evaluate_asset_compliance",
+            AsyncMock(return_value=mocked_audit_result),
+        )
+
+        # 4. Fail specifically when SQLAlchemy tries to flush an EvidenceLink.
+        def fail_evidence_link_flush(session, flush_context, instances):
+            if any(
+                isinstance(obj, EvidenceLink)
+                for obj in session.new
+            ):
+                raise RuntimeError(
+                    "Simulated evidence-link insertion failure"
+                )
+
+        event.listen(Session, "before_flush", fail_evidence_link_flush)
+
+        try:
+            response = await ac.post(
+                f"/api/v1/assets/{asset_id}/versions/{asset_version_id}/audit",
+                headers=headers,
+            )
+        finally:
+            event.remove(
+                Session,
+                "before_flush",
+                fail_evidence_link_flush,
+            )
+
+        assert response.status_code == 500
+
+        # 5. Verify that the original records survived the rollback.
+        async with AsyncSessionLocal() as db:
+            findings_after_failure = (
+                await db.execute(
+                    select(Finding).where(
+                        Finding.asset_version_id == asset_version_id,
+                        Finding.organisation_id == organisation_id,
+                    )
+                )
+            ).scalars().all()
+
+            links_after_failure = (
+                await db.execute(
+                    select(EvidenceLink).where(
+                        EvidenceLink.organisation_id == organisation_id,
+                        EvidenceLink.finding_id == original_finding_id,
+                    )
+                )
+            ).scalars().all()
+
+            all_links_after_failure = (
+                await db.execute(
+                    select(EvidenceLink).where(
+                        EvidenceLink.organisation_id == organisation_id,
+                        EvidenceLink.source_version_id == source_version_id,
+                    )
+                )
+            ).scalars().all()
+
+        assert len(findings_after_failure) == 1
+        assert findings_after_failure[0].id == original_finding_id
+        assert (
+            findings_after_failure[0].explanation
+            == "Original finding before evidence failure."
+        )
+
+        assert len(links_after_failure) == 1
+        assert links_after_failure[0].id == original_link_id
+        assert links_after_failure[0].passage_id == "original-passage"
+
+        assert len(all_links_after_failure) == 1
+
+        print("Evidence-link insertion failure: PASSED")
+        print("API error response: HTTP", response.status_code)
+        print("Original finding preserved: PASSED")
+        print("Original evidence link preserved: PASSED")
+        print("Partial replacement evidence links: 0")
