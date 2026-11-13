@@ -41,11 +41,11 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-            Human Review Queue
+          <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+            {currentUser.role === 'compliance_reviewer' ? 'Pending Reviews' : 'Review Queue'}
           </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Product Rule 10: Human reviewers make the final approval decision. Review SLA targets are actively tracked.
+          <p className="mt-1 text-sm leading-5 text-[#4B5869]">
+            Review submitted content by priority and status.
           </p>
         </div>
 
@@ -72,11 +72,11 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
         <div className="flex items-center gap-2.5">
           <Clock className="w-4 h-4 text-[#F59E0B]" />
           <span className="text-[#F8FAFC]">
-            Average Governance Decision Turnaround: <strong className="font-mono text-[#F59E0B]">4.2 Hours</strong>
+            Average Governance Decision Turnaround: <strong className="text-[#F59E0B]"><span className="font-mono">4.2</span> Hours</strong>
           </span>
         </div>
-        <span className="text-[11px] text-[#64748B] font-mono">
-          Target SLA: 24.0 Hours
+        <span className="text-xs text-[#64748B]">
+          Target SLA: <span className="font-mono">24.0</span> Hours
         </span>
       </div>
 
@@ -106,7 +106,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                 {/* Header row */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-[10px] uppercase font-mono tracking-wider font-semibold px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#818CF8]">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#818CF8]">
                       {item.channel.replace('_', ' ')}
                     </span>
                     <span className="text-sm font-bold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors">
@@ -118,9 +118,9 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-xs text-[#F59E0B] font-mono bg-[#F59E0B]/10 px-2.5 py-1 rounded border border-[#F59E0B]/20">
+                    <div className="flex items-center gap-1.5 text-xs text-[#F59E0B] bg-[#F59E0B]/10 px-2.5 py-1 rounded border border-[#F59E0B]/20">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{item.sla_hours_remaining.toFixed(1)}h remaining</span>
+                      <span><span className="font-mono">{item.sla_hours_remaining.toFixed(1)}h</span> remaining</span>
                     </div>
                     <Badge status={item.status} size="sm" />
                   </div>

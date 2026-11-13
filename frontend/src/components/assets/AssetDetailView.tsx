@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Asset, AssetVersion, AuditFinding, EvidenceReference, User } from '../../types';
+import { roleLabel } from '../../config/roles';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { Card, CardBody, CardHeader } from '../UI/Card';
@@ -31,12 +32,13 @@ import { AuditFindingsList } from '../audit/AuditFindingsList';
 import { EvidenceDrawer } from '../audit/EvidenceDrawer';
 import { DecisionModal } from '../reviews/DecisionModal';
 import { auditService } from '../../services/API/auditService';
-import { assetsService } from '../../services/API/assetsService';
+import { assetsService, canCreatorOpenAssetDetails } from '../../services/API/assetsService';
 import { reviewsService } from '../../services/API/reviewsService';
 
 interface AssetDetailViewProps {
   assetId: string;
   currentUser: User;
+  allowCreatorSubmissionAccess: boolean;
   onBack: () => void;
   onViewSource?: (sourceId: string) => void;
 }
@@ -44,10 +46,14 @@ interface AssetDetailViewProps {
 export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   assetId,
   currentUser,
+  allowCreatorSubmissionAccess,
   onBack,
   onViewSource,
 }) => {
   const [asset, setAsset] = useState<Asset | null>(null);
+  const [assetLoadState, setAssetLoadState] = useState<'loading' | 'ready' | 'denied' | 'unavailable'>('loading');
+  const assetLoadRequest = useRef(0);
+  const findingsLoadRequest = useRef(0);
   const [selectedVersionId, setSelectedVersionId] = useState<string>('');
   const [findings, setFindings] = useState<AuditFinding[]>([]);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -71,23 +77,49 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
   // Load Asset data
   const loadAsset = async () => {
+    const requestId = ++assetLoadRequest.current;
+    findingsLoadRequest.current += 1;
+    setAssetLoadState('loading');
     const data = await assetsService.getAssetById(assetId);
-    if (data) {
-      setAsset(data);
-      const activeVerId = selectedVersionId || data.current_version_id || data.versions[data.versions.length - 1]?.version_id;
-      setSelectedVersionId(activeVerId);
-      loadFindings(data.id, activeVerId);
+    if (requestId !== assetLoadRequest.current) return;
+
+    if (!data) {
+      setAsset(null);
+      setFindings([]);
+      setAssetLoadState('unavailable');
+      return;
     }
+
+    if (currentUser.role === 'creator'
+      && !canCreatorOpenAssetDetails(data, currentUser.id, allowCreatorSubmissionAccess)) {
+      setAsset(null);
+      setFindings([]);
+      setAssetLoadState('denied');
+      return;
+    }
+
+    setAsset(data);
+    const activeVerId = data.versions.some(version => version.version_id === selectedVersionId)
+      ? selectedVersionId
+      : data.current_version_id || data.versions[data.versions.length - 1]?.version_id;
+    setSelectedVersionId(activeVerId);
+    setAssetLoadState('ready');
+    loadFindings(data.id, activeVerId);
   };
 
   const loadFindings = async (aId: string, vId: string) => {
+    const requestId = ++findingsLoadRequest.current;
     const list = await auditService.getFindings(aId, vId);
-    setFindings(list);
+    if (requestId === findingsLoadRequest.current && aId === assetId) setFindings(list);
   };
 
   useEffect(() => {
+    setAsset(null);
     loadAsset();
-  }, [assetId]);
+    return () => {
+      assetLoadRequest.current += 1;
+    };
+  }, [assetId, currentUser.id, currentUser.role, allowCreatorSubmissionAccess]);
 
   useEffect(() => {
     if (asset && selectedVersionId) {
@@ -99,10 +131,32 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
     }
   }, [selectedVersionId]);
 
-  if (!asset) {
+  if (assetLoadState === 'loading' || (asset && asset.id !== assetId)) {
     return (
       <div className="p-8 text-center text-sm text-[#94A3B8]">
         Loading governance asset record...
+      </div>
+    );
+  }
+
+  if (assetLoadState === 'denied'
+    || (currentUser.role === 'creator'
+      && (!asset || !canCreatorOpenAssetDetails(asset, currentUser.id, allowCreatorSubmissionAccess)))) {
+    return (
+      <div role="alert" className="mx-auto max-w-xl rounded-xl border border-[#DCE2E9] bg-white p-8 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-[#1B2533]">Content unavailable</h1>
+        <p className="mt-2 text-sm leading-6 text-[#4B5869]">
+          For privacy, Creators can open details only by selecting an owned item in My submissions.
+        </p>
+        <Button className="mt-5" onClick={onBack}>Back to My submissions</Button>
+      </div>
+    );
+  }
+
+  if (assetLoadState === 'unavailable' || !asset) {
+    return (
+      <div role="alert" className="p-8 text-center text-sm text-[#4B5869]">
+        This asset is unavailable.
       </div>
     );
   }
@@ -149,7 +203,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       notes,
     });
     await loadAsset();
-    setToastMessage(`Formal review decision recorded: ${decision.toUpperCase()}`);
+    setToastMessage(`Formal review decision recorded: ${decision.replaceAll('_', ' ')}`);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -252,7 +306,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#6366F1] font-semibold bg-[#6366F1]/10 px-2.5 py-0.5 rounded border border-[#6366F1]/25">
+                <span className="text-xs font-semibold text-[#6366F1] bg-[#6366F1]/10 px-2.5 py-0.5 rounded border border-[#6366F1]/25">
                   {asset.channel.replace('_', ' ')}
                 </span>
                 <span className="text-xs text-[#64748B]">•</span>
@@ -262,14 +316,14 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                 <Badge status={currentVersion.audit_status} size="sm" />
               </div>
 
-              <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
+              <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
                 {asset.title}
               </h1>
 
               <div className="flex flex-wrap items-center gap-4 text-xs text-[#64748B] pt-1">
                 <div className="flex items-center gap-1.5">
                   <UserIcon className="w-3.5 h-3.5 text-[#94A3B8]" />
-                  <span>Author: <strong className="text-[#F8FAFC]">{currentVersion.created_by.name}</strong> ({currentVersion.created_by.title})</span>
+                  <span>Author: <strong className="text-[#F8FAFC]">{currentVersion.created_by.name}</strong> ({roleLabel(currentVersion.created_by.role)})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
@@ -284,7 +338,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                 <Lock className="w-4 h-4 text-[#818CF8]" />
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase font-mono text-[#64748B]">
+                <div className="text-xs text-[#64748B]">
                   Version Registry
                 </div>
                 <div className="text-xs font-semibold text-[#F8FAFC] font-mono">
@@ -297,7 +351,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           {/* Immutable Version Selector Tabs */}
           <div className="mt-6 pt-4 border-t border-[#253047] flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#94A3B8] uppercase font-mono mr-1">
+              <span className="text-sm font-semibold text-[#94A3B8] mr-1">
                 Version History:
               </span>
               <div className="flex items-center gap-1.5">
@@ -354,45 +408,52 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="flex-1 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider font-mono">
-                Formal Review Record: {currentVersion.review_decision.decision.toUpperCase()}
+              <span className="text-sm font-semibold capitalize">
+                Formal review record: {currentVersion.review_decision.decision.replaceAll('_', ' ')}
               </span>
               <span className="text-[11px] text-[#94A3B8] font-mono">
                 {new Date(currentVersion.review_decision.timestamp).toLocaleString()}
               </span>
             </div>
-            <p className="text-xs text-[#F8FAFC] font-medium leading-relaxed">
-              "{currentVersion.review_decision.notes}"
-            </p>
-            <div className="text-[11px] text-[#94A3B8] font-mono">
-              Signed by reviewer: <strong className="text-[#F8FAFC]">{currentVersion.review_decision.reviewer.name}</strong> ({currentVersion.review_decision.reviewer.title})
+            {currentUser.role !== 'creator' && (
+              <p className="text-xs text-[#F8FAFC] font-medium leading-relaxed">
+                "{currentVersion.review_decision.notes}"
+              </p>
+            )}
+            <div className="text-sm text-[#94A3B8]">
+              Signed by reviewer: <strong className="text-[#F8FAFC]">{currentVersion.review_decision.reviewer.name}</strong> ({roleLabel(currentVersion.review_decision.reviewer.role)})
             </div>
           </div>
         </div>
+      )}
+      {currentUser.role === 'creator' && asset.versions.some(version => version.review_decision) && (
+        <p className="text-xs text-[#5C6878]">
+          Reviewer notes are hidden because the available record does not distinguish internal notes from creator-facing feedback.
+        </p>
       )}
 
       {/* Audit Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-4 rounded-xl bg-[#111827] border border-[#253047]">
-          <div className="text-[10px] uppercase font-mono text-[#64748B]">Total Findings</div>
+          <div className="text-xs text-[#64748B]">Total Findings</div>
           <div className="text-xl font-bold text-[#F8FAFC] mt-1 tabular-nums font-mono">
             {findings.length}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#111827] border border-[#253047]">
-          <div className="text-[10px] uppercase font-mono text-[#EF4444]">Rule Breaches</div>
+          <div className="text-xs text-[#EF4444]">Rule Breaches</div>
           <div className="text-xl font-bold text-[#EF4444] mt-1 tabular-nums font-mono">
             {findings.filter(f => f.severity === 'breach').length}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#111827] border border-[#253047]">
-          <div className="text-[10px] uppercase font-mono text-[#F59E0B]">Review Warnings</div>
+          <div className="text-xs text-[#F59E0B]">Review Warnings</div>
           <div className="text-xl font-bold text-[#F59E0B] mt-1 tabular-nums font-mono">
             {findings.filter(f => f.severity === 'warning').length}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#111827] border border-[#253047]">
-          <div className="text-[10px] uppercase font-mono text-[#10B981]">Conforming Clauses</div>
+          <div className="text-xs text-[#10B981]">Conforming Clauses</div>
           <div className="text-xl font-bold text-[#10B981] mt-1 tabular-nums font-mono">
             {currentVersion.audit_summary?.compliant_checks || 18}
           </div>
@@ -403,10 +464,10 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="flex items-center justify-between border-b border-[#253047]">
         <Tabs
           tabs={[
-            { id: 'diff', label: 'AI Inspection Diff Box' },
-            { id: 'findings', label: 'Audit Findings Matrix', badge: findings.length },
-            { id: 'history', label: 'Version Ledger & Decisions', badge: asset.versions.length },
-            ...(isCreatingRevision ? [{ id: 'editor', label: 'Draft Next Revision' }] : []),
+            { id: 'diff', label: 'Content review' },
+            { id: 'findings', label: 'Findings', badge: findings.length },
+            { id: 'history', label: 'Version history', badge: asset.versions.length },
+            ...(isCreatingRevision ? [{ id: 'editor', label: 'Edit revision' }] : []),
           ]}
           activeTab={activeTab}
           onChange={tabId => setActiveTab(tabId as 'diff' | 'findings' | 'history' | 'editor')}
@@ -470,7 +531,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                     </span>
                     <Badge status={v.audit_status} size="sm" />
                     {v.version_id === selectedVersionId && (
-                      <span className="text-[10px] text-[#6366F1] font-mono">(Currently Inspecting)</span>
+                      <span className="text-xs text-[#6366F1]">(Currently inspecting)</span>
                     )}
                   </div>
                   <span className="text-[11px] text-[#64748B] font-mono">
@@ -484,10 +545,12 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
                 {v.review_decision && (
                   <div className="p-3 rounded-lg bg-[#111827] border border-[#253047] text-xs space-y-1">
-                    <div className="text-[11px] font-semibold text-[#10B981] uppercase font-mono">
-                      Decision: {v.review_decision.decision.toUpperCase()} by {v.review_decision.reviewer.name}
+                    <div className="text-xs font-semibold text-[#10B981]">
+                      Decision: {v.review_decision.decision.replaceAll('_', ' ')} by {v.review_decision.reviewer.name}
                     </div>
-                    <div className="text-[#94A3B8]">"{v.review_decision.notes}"</div>
+                    {currentUser.role !== 'creator' && (
+                      <div className="text-[#94A3B8]">"{v.review_decision.notes}"</div>
+                    )}
                   </div>
                 )}
 
@@ -530,7 +593,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                 value={revisionContent}
                 onChange={e => setRevisionContent(e.target.value)}
                 rows={8}
-                className="w-full rounded-md bg-[#0D1220] border border-[#253047] p-3 text-sm text-[#F8FAFC] font-mono leading-relaxed focus:outline-none focus:border-[#6366F1]"
+                className="w-full rounded-md bg-[#0D1220] border border-[#253047] p-3 text-sm text-[#F8FAFC] leading-relaxed focus:outline-none focus:border-[#6366F1]"
               />
             </div>
 

@@ -109,7 +109,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
               </p>
 
               <div className="pt-1 flex items-center justify-between text-[11px] text-[#818CF8]">
-                <span className="flex items-center gap-1 text-[10px] uppercase font-mono text-[#64748B]">
+                <span className="flex items-center gap-1 text-xs text-[#64748B]">
                   {n.type.replace('_', ' ')}
                 </span>
                 <span className="flex items-center gap-1 hover:underline">

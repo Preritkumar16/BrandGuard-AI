@@ -45,14 +45,14 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header
-      className={`fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-[#253047] bg-white px-3 sm:gap-3 sm:px-4 transition-all duration-200 ${
+      className={`fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-[#DCE2E9] bg-white px-3 shadow-sm sm:gap-3 sm:px-4 transition-all duration-200 ${
         collapsed ? 'lg:left-16' : 'lg:left-64'
       }`}
     >
       <div className="flex min-w-0 items-center gap-2">
         <MobileMenuButton onClick={onOpenMobileNav} />
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs font-medium text-[#94A3B8]">
-          <span className="hidden items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-[#818CF8] sm:flex">
+          <span className="hidden items-center gap-1.5 text-sm font-semibold text-[#315EA8] sm:flex">
             <Shield aria-hidden="true" className="h-4 w-4" />
             BrandGuard
           </span>

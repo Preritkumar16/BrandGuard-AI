@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header, BreadcrumbItem } from './components/layout/Header';
-import { DashboardOverview } from './components/dashboard/DashboardOverview';
+import { RoleDashboard } from './components/dashboard/RoleDashboard';
 import { AssetListView } from './components/assets/AssetListView';
 import { AssetDetailView } from './components/assets/AssetDetailView';
 import { ReviewQueueView } from './components/reviews/ReviewQueueView';
@@ -19,19 +19,18 @@ import { NewSourceModal } from './components/sources/NewSourceModal';
 import { LoginPage } from './components/auth/LoginPage';
 import { RbacMatrixModal } from './components/auth/RbacMatrixModal';
 import { NotificationsDrawer, NotificationItem } from './components/common/NotificationsDrawer';
-import { ComplianceHealthModal } from './components/common/ComplianceHealthModal';
 import { PolicyRulesModal } from './components/common/PolicyRulesModal';
 import { Modal } from './components/UI/Modal';
 import { Input } from './components/UI/Input';
 import { Asset, BrandSource, ReviewQueueItem, User } from './types';
 import { authService } from './services/API/authService';
-import { assetsService } from './services/API/assetsService';
+import { assetsService, canCreatorOpenAssetDetails, isAssetOwnedBy } from './services/API/assetsService';
 import { sourcesService } from './services/API/sourcesService';
 import { reviewsService } from './services/API/reviewsService';
 import { auditService } from './services/API/auditService';
 import { performGlobalSearch } from './services/API/searchService';
 import { Search, FileText, BookOpen, AlertCircle } from 'lucide-react';
-import { AppScreen, NavItem, navigationFor } from './config/navigation';
+import { AppScreen, NavItem, navigationFor, screenLabel } from './config/navigation';
 
 
 // Tabs used by the main application content.
@@ -54,27 +53,20 @@ const SCREEN_TO_TAB: Partial<Record<AppScreen, NavTab>> = {
   settings: 'settings',
   activity: 'audit-log',
   'asset-workspace': 'asset-detail',
-  findings: 'queue',
-  reports: 'audit-log',
-  'source-upload': 'sources',
-  'source-detail': 'sources',
-  'source-history': 'sources',
-  feedback: 'queue',
 };
 
 function navigationItemsFor(role: User['role']): NavItem[] {
-  const seenDestinations = new Set<string>();
-
-  return navigationFor(role).filter(item => {
-    const destination = item.id === 'submit' ? 'submit' : SCREEN_TO_TAB[item.id];
-    if (!destination || seenDestinations.has(destination)) return false;
-    seenDestinations.add(destination);
-    return true;
-  });
+  return navigationFor(role);
 }
 
 // Keeps the Sidebar's selected screen in sync with the active App tab.
-function getScreenForTab(tab: NavTab): AppScreen {
+function getScreenForTab(tab: NavTab, role: User['role']): AppScreen {
+  const navItem = navigationItemsFor(role).find(item => {
+    const destination = item.id === 'submit' ? 'submit' : SCREEN_TO_TAB[item.id];
+    return destination === tab;
+  });
+  if (navItem) return navItem.id;
+
   switch (tab) {
     case 'asset-detail':
       return 'asset-workspace';
@@ -93,6 +85,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authService.isAuthenticated());
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('asset-sentinel-launch');
+  const [allowCreatorSubmissionAccess, setAllowCreatorSubmissionAccess] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [sourcesCategoryFilter, setSourcesCategoryFilter] = useState<string>('all');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -112,7 +105,6 @@ export default function App() {
   const [newSourceModalOpen, setNewSourceModalOpen] = useState<boolean>(false);
   const [searchModalOpen, setSearchModalOpen] = useState<boolean>(false);
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
-  const [complianceHealthOpen, setComplianceHealthOpen] = useState<boolean>(false);
   const [policyRulesOpen, setPolicyRulesOpen] = useState<boolean>(false);
   const [rbacModalOpen, setRbacModalOpen] = useState<boolean>(false);
 
@@ -154,11 +146,11 @@ export default function App() {
   // Initial Data Load
   const refreshAllData = async () => {
     try {
-      const [assetsData, sourcesData, queueData, userData] = await Promise.all([
+      const userData = await authService.getMe();
+      const [assetsData, sourcesData, queueData] = await Promise.all([
         assetsService.getAssets(),
         sourcesService.getSources(),
         reviewsService.getQueue(),
-        authService.getMe(),
       ]);
       setAssets(assetsData);
       setSources(sourcesData);
@@ -191,24 +183,31 @@ export default function App() {
   const getBreadcrumbs = (): BreadcrumbItem[] => {
     switch (currentTab) {
       case 'dashboard':
-        return [{ label: 'Executive Operations Overview' }];
+        return [{ label: screenLabel(currentUser.role, 'dashboard') }];
       case 'governance-hub':
-        return [{ label: 'Policy Assurance & Verification Matrix' }];
+        return [{ label: 'Governance overview' }];
       case 'queue':
-        return [{ label: 'Human Review Workflow' }];
+        return [{ label: screenLabel(currentUser.role, 'queue') }];
       case 'assets':
-        return [{ label: 'Marketing Content Inventory' }];
+        return [{ label: 'Asset Library' }];
       case 'sources':
-        return [{ label: 'Brand Guidelines Catalog' }];
+        return [{ label: 'Brand Guidelines' }];
       case 'audit-log':
-        return [{ label: 'Immutable Audit Trail' }];
+        return [{ label: 'Activity History' }];
       case 'settings':
-        return [{ label: 'Governance Engine Settings' }];
+        return [{ label: 'Settings' }];
       case 'asset-detail': {
-        const found = assets.find(a => a.id === selectedAssetId);
+        const selectedAsset = assets.find(a => a.id === selectedAssetId);
+        const found = currentUser.role === 'creator'
+          && (!selectedAsset
+            || !canCreatorOpenAssetDetails(selectedAsset, currentUser.id, allowCreatorSubmissionAccess))
+          ? undefined
+          : selectedAsset;
         return [
-          { label: 'Marketing Content Inventory', screen: 'assets' },
-          { label: found ? found.title : 'Asset Inspection' },
+          currentUser.role === 'creator'
+            ? { label: 'My submissions', screen: 'dashboard' }
+            : { label: 'Asset Library', screen: 'assets' },
+          { label: found ? found.title : 'Asset details' },
         ];
       }
       default:
@@ -216,7 +215,13 @@ export default function App() {
     }
   };
 
-  const handleSelectAsset = (assetId: string) => {
+  const handleSelectAsset = (assetId: string, fromCreatorSubmissionList = false) => {
+    const selectedAsset = assets.find(asset => asset.id === assetId);
+    setAllowCreatorSubmissionAccess(
+      currentUser.role === 'creator'
+      && Boolean(selectedAsset
+        && canCreatorOpenAssetDetails(selectedAsset, currentUser.id, fromCreatorSubmissionList)),
+    );
     setSelectedAssetId(assetId);
     setCurrentTab('asset-detail');
   };
@@ -247,8 +252,19 @@ export default function App() {
   }
 
   // Execute deep global search
+  const visibleAssets = currentUser.role === 'creator'
+    ? assets.filter(asset => isAssetOwnedBy(asset, currentUser.id))
+    : assets;
+  const visibleAssetIds = new Set(visibleAssets.map(asset => asset.id));
+  const visibleVersionIds = new Set(visibleAssets.flatMap(asset => asset.versions.map(version => version.version_id)));
   const allFindings = auditService.getAllFindingsSync();
-  const searchResults = performGlobalSearch(searchQuery, assets, sources, allFindings);
+  const visibleFindings = currentUser.role === 'creator'
+    ? Object.fromEntries(Object.entries(allFindings).filter(([versionId]) => visibleVersionIds.has(versionId)))
+    : allFindings;
+  const searchResults = performGlobalSearch(searchQuery, visibleAssets, sources, visibleFindings);
+  const visibleNotifications = currentUser.role === 'creator'
+    ? notifications.filter(notification => !notification.assetId || visibleAssetIds.has(notification.assetId))
+    : notifications;
 
   const filteredSearchResults = searchResults.filter(item => {
     if (searchTypeFilter === 'all') return true;
@@ -263,7 +279,7 @@ export default function App() {
       {/* Sidebar Navigation Rail */}
       <Sidebar
         items={navigationItemsFor(currentUser.role)}
-        currentScreen={getScreenForTab(currentTab)}
+        currentScreen={getScreenForTab(currentTab, currentUser.role)}
         onSelectScreen={(screen: AppScreen) => {
           if (screen === 'submit') {
             setNewAssetModalOpen(true);
@@ -282,7 +298,13 @@ export default function App() {
           }
         }}
         currentUser={currentUser}
-        onUserChanged={user => setCurrentUser(user)}
+        onUserChanged={user => {
+          setCurrentUser(user);
+          if (user.role === 'creator') {
+            setCurrentTab('dashboard');
+            setAllowCreatorSubmissionAccess(false);
+          }
+        }}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() =>
           setSidebarCollapsed(previous => !previous)
@@ -303,7 +325,7 @@ export default function App() {
         onSearchClick={() => setSearchModalOpen(true)}
         onOpenRbacModal={() => setRbacModalOpen(true)}
         onNotificationsClick={() => setNotificationsOpen(true)}
-        unreadNotificationsCount={notifications.filter(n => !n.read).length}
+        unreadNotificationsCount={visibleNotifications.filter(n => !n.read).length}
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenMobileNav={() => setMobileSidebarOpen(true)}
@@ -317,23 +339,24 @@ export default function App() {
       >
         <div className="max-w-[1560px] mx-auto">
           {isLoading ? (
-            <div className="p-16 text-center text-xs text-[#64748B] font-mono">
+            <div className="p-16 text-center text-sm text-[#64748B]">
               Initializing BrandGuard AI Governance Environment...
             </div>
           ) : (
             <>
               {currentTab === 'dashboard' && (
-                <DashboardOverview
-                  assets={assets}
+                <RoleDashboard
+                  assets={visibleAssets}
                   sources={sources}
-                  queue={queue}
+                  queue={currentUser.role === 'creator' ? [] : queue}
                   currentUser={currentUser}
-                  onSelectAsset={handleSelectAsset}
+                  onSelectAsset={assetId => handleSelectAsset(assetId, currentUser.role === 'creator')}
                   onNavigateToQueue={() => setCurrentTab('queue')}
                   onNavigateToSources={handleNavigateToSources}
                   onNavigateToAssets={() => setCurrentTab('assets')}
+                  onNavigateToAuditLog={() => setCurrentTab('audit-log')}
                   onNewAssetClick={() => setNewAssetModalOpen(true)}
-                  onOpenComplianceHealth={() => setComplianceHealthOpen(true)}
+                  onOpenRbacMatrix={() => setRbacModalOpen(true)}
                   onOpenPolicyRules={() => setPolicyRulesOpen(true)}
                 />
               )}
@@ -348,7 +371,13 @@ export default function App() {
                 />
               )}
 
-              {currentTab === 'queue' && (
+              {currentTab === 'queue' && currentUser.role === 'creator' && (
+                <div role="alert" className="rounded-xl border border-[#DCE2E9] bg-white p-6 text-sm text-[#4B5869]">
+                  The Review Queue is not available to Creator accounts. Track your submissions from My submissions.
+                </div>
+              )}
+
+              {currentTab === 'queue' && currentUser.role !== 'creator' && (
                 <ReviewQueueView
                   queue={queue}
                   currentUser={currentUser}
@@ -358,7 +387,8 @@ export default function App() {
 
               {currentTab === 'assets' && (
                 <AssetListView
-                  assets={assets}
+                  assets={visibleAssets}
+                  currentUser={currentUser}
                   onSelectAsset={handleSelectAsset}
                   onNewAssetClick={() => setNewAssetModalOpen(true)}
                 />
@@ -381,7 +411,8 @@ export default function App() {
                 <AssetDetailView
                   assetId={selectedAssetId}
                   currentUser={currentUser}
-                  onBack={() => setCurrentTab('assets')}
+                  allowCreatorSubmissionAccess={allowCreatorSubmissionAccess}
+                  onBack={() => setCurrentTab(currentUser.role === 'creator' ? 'dashboard' : 'assets')}
                   onViewSource={srcId => {
                     setSelectedSourceId(srcId);
                     setCurrentTab('sources');
@@ -391,7 +422,8 @@ export default function App() {
 
               {currentTab === 'audit-log' && (
                 <AuditLogView
-                  assets={assets}
+                  assets={visibleAssets}
+                  currentUser={currentUser}
                   onSelectAsset={handleSelectAsset}
                 />
               )}
@@ -410,8 +442,9 @@ export default function App() {
         onClose={() => setNewAssetModalOpen(false)}
         onAssetCreated={newAsset => {
           setAssets(prev => [newAsset, ...prev]);
-          setSelectedAssetId(newAsset.id);
-          setCurrentTab('asset-detail');
+          setAllowCreatorSubmissionAccess(false);
+          setCurrentTab(currentUser.role === 'creator' ? 'dashboard' : 'asset-detail');
+          if (currentUser.role !== 'creator') setSelectedAssetId(newAsset.id);
         }}
       />
 
@@ -430,20 +463,19 @@ export default function App() {
       <NotificationsDrawer
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
-        notifications={notifications}
+        notifications={visibleNotifications}
         onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
-        onNavigateToAsset={handleSelectAsset}
+        onNavigateToAsset={assetId => {
+          if (currentUser.role === 'creator') {
+            setCurrentTab('dashboard');
+          } else {
+            handleSelectAsset(assetId);
+          }
+        }}
         onNavigateToSource={srcId => {
           setSelectedSourceId(srcId);
           setCurrentTab('sources');
         }}
-      />
-
-      {/* Compliance Health Breakdown Modal */}
-      <ComplianceHealthModal
-        isOpen={complianceHealthOpen}
-        onClose={() => setComplianceHealthOpen(false)}
-        onNavigateToSources={handleNavigateToSources}
       />
 
       {/* Governance Principles Rules Modal */}
@@ -530,50 +562,56 @@ export default function App() {
               </div>
             ) : null}
 
-            {filteredSearchResults.map(item => (
-              <div
-                key={item.id}
-                onClick={() => {
-                  setSearchModalOpen(false);
-                  setSearchQuery('');
-                  if (item.assetId) {
+            {filteredSearchResults.map(item => {
+              const canNavigate = Boolean(item.sourceId)
+                || (currentUser.role !== 'creator' && Boolean(item.assetId));
+              return (
+                <div
+                  key={item.id}
+                  onClick={canNavigate ? () => {
+                    setSearchModalOpen(false);
+                    setSearchQuery('');
+                    if (item.assetId && currentUser.role !== 'creator') {
                     handleSelectAsset(item.assetId);
-                  } else if (item.sourceId) {
-                    setSelectedSourceId(item.sourceId);
-                    setCurrentTab('sources');
-                  }
-                }}
-                className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] hover:border-[#6366F1] transition-all cursor-pointer space-y-1.5 group"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {item.type === 'asset' ? (
-                      <FileText className="w-3.5 h-3.5 text-[#818CF8] shrink-0" />
-                    ) : item.type === 'finding' ? (
-                      <AlertCircle className="w-3.5 h-3.5 text-[#EF4444] shrink-0" />
-                    ) : (
-                      <BookOpen className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
-                    )}
-                    <span className="text-xs font-semibold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors">
-                      {item.title}
+                    } else if (item.sourceId) {
+                      setSelectedSourceId(item.sourceId);
+                      setCurrentTab('sources');
+                    }
+                  } : undefined}
+                  className={`p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] transition-all space-y-1.5 group ${
+                    canNavigate ? 'cursor-pointer hover:border-[#6366F1]' : 'cursor-default'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {item.type === 'asset' ? (
+                        <FileText className="w-3.5 h-3.5 text-[#818CF8] shrink-0" />
+                      ) : item.type === 'finding' ? (
+                        <AlertCircle className="w-3.5 h-3.5 text-[#EF4444] shrink-0" />
+                      ) : (
+                        <BookOpen className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+                      )}
+                      <span className="text-xs font-semibold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors">
+                        {item.title}
+                      </span>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#94A3B8]">
+                      {item.matchedField}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#94A3B8]">
-                    {item.matchedField}
-                  </span>
-                </div>
 
-                <div className="text-[11px] text-[#94A3B8]">
-                  {item.subtitle}
-                </div>
-
-                {item.matchContext && (
-                  <div className="text-[11px] font-mono text-[#818CF8] bg-[#111827] p-2 rounded border border-[#253047]/60 leading-relaxed">
-                    {item.matchContext}
+                  <div className="text-[11px] text-[#94A3B8]">
+                    {item.subtitle}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {item.matchContext && (
+                    <div className="text-sm text-[#818CF8] bg-[#111827] p-2 rounded border border-[#253047]/60 leading-relaxed">
+                      {item.matchContext}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {!searchQuery && (
               <div className="text-xs text-[#64748B] space-y-3 pt-2">
@@ -586,7 +624,7 @@ export default function App() {
                     'Section 4.1',
                     'Banned Superlatives',
                     'Trademark Casing',
-                    'Sarah Lin',
+                    'Rohit Sharma',
                     'SOC 2',
                   ].map(term => (
                     <button

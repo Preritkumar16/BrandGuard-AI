@@ -12,11 +12,13 @@ import { Select } from '../UI/Select';
 
 interface AuditLogViewProps {
   assets: Asset[];
+  currentUser: User;
   onSelectAsset: (assetId: string) => void;
 }
 
 export const AuditLogView: React.FC<AuditLogViewProps> = ({
   assets,
+  currentUser,
   onSelectAsset,
 }) => {
   const [filterType, setFilterType] = useState<string>('all');
@@ -60,8 +62,10 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           versionNumber: v.version_number,
           type: 'decision',
           author: v.review_decision.reviewer.name,
-          title: `Formal Review Decision: ${v.review_decision.decision.toUpperCase()}`,
-          details: v.review_decision.notes,
+          title: `Formal Review Decision: ${v.review_decision.decision.replaceAll('_', ' ')}`,
+          details: currentUser.role === 'creator'
+            ? 'Reviewer notes are unavailable because their visibility is not specified.'
+            : v.review_decision.notes,
           status: v.review_decision.decision,
           timestamp: v.review_decision.timestamp,
         });
@@ -98,11 +102,11 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-            Immutable Audit Trail & Governance Log
+          <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+            Activity History
           </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Complete append-only historical ledger of policy scans, version commits, and formal human reviewer decisions.
+          <p className="mt-1 text-sm leading-5 text-[#4B5869]">
+            See content updates, automated checks, and review decisions.
           </p>
         </div>
 

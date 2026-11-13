@@ -8,19 +8,19 @@ interface StatCardProps {
 }
 
 const toneClass = {
-  default: 'text-[#F8FAFC]',
-  good: 'text-[#34D399]',
-  warn: 'text-[#F59E0B]',
-  bad: 'text-[#FB7185]',
-  info: 'text-[#818CF8]',
+  default: { value: 'text-[#1B2533]', accent: 'border-l-[#D5DDE7]', surface: 'bg-white' },
+  good: { value: 'text-[#087443]', accent: 'border-l-[#087443]', surface: 'bg-[#F3FAF5]' },
+  warn: { value: 'text-[#925700]', accent: 'border-l-[#925700]', surface: 'bg-[#FFFAF0]' },
+  bad: { value: 'text-[#B42318]', accent: 'border-l-[#B42318]', surface: 'bg-[#FFF6F5]' },
+  info: { value: 'text-[#315EA8]', accent: 'border-l-[#315EA8]', surface: 'bg-[#F4F8FD]' },
 };
 
 export const StatCard: React.FC<StatCardProps> = ({ label, value, hint, tone = 'default' }) => {
   return (
-    <div className="rounded-xl border border-[#253047] bg-[#111827] px-4 py-3">
-      <p className="text-[10px] font-mono uppercase tracking-wider text-[#64748B]">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${toneClass[tone]}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-[#94A3B8]">{hint}</p>}
+    <div className={`min-h-28 rounded-xl border border-[#DCE2E9] border-l-4 px-4 py-4 shadow-sm ${toneClass[tone].accent} ${toneClass[tone].surface}`}>
+      <p className="text-sm font-medium text-[#4B5869]">{label}</p>
+      <p className={`mt-2 text-3xl font-semibold leading-none tabular-nums ${toneClass[tone].value}`}>{value}</p>
+      {hint && <p className="mt-2 text-xs leading-5 text-[#5C6878]">{hint}</p>}
     </div>
   );
 };

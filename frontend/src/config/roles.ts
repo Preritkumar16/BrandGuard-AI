@@ -11,17 +11,17 @@ export interface RoleMeta {
 export const ROLE_META: Record<UserRole, RoleMeta> = {
   admin: {
     role: 'admin',
-    name: 'Organisation Admin',
-    badge: 'Organisation Admin',
+    name: 'Admin',
+    badge: 'Admin',
     description: 'Tenant governance, user provisioning, and oversight. Does not auto-approve content.',
     homeLabel: 'Organisation overview',
   },
   source_owner: {
     role: 'source_owner',
-    name: 'Source Owner',
-    badge: 'Source Owner',
+    name: 'Brand Manager',
+    badge: 'Brand Manager',
     description: 'Owns brand-source custody, uploads, and version history.',
-    homeLabel: 'Source dashboard',
+    homeLabel: 'Brand Manager dashboard',
   },
   creator: {
     role: 'creator',
@@ -32,8 +32,8 @@ export const ROLE_META: Record<UserRole, RoleMeta> = {
   },
   reviewer: {
     role: 'reviewer',
-    name: 'Reviewer / Approver',
-    badge: 'Reviewer / Approver',
+    name: 'Reviewer',
+    badge: 'Reviewer',
     description: 'Inspects a specific version and approves, rejects, or requests changes.',
     homeLabel: 'Review dashboard',
   },

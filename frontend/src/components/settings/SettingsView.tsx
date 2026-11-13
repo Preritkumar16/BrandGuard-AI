@@ -12,6 +12,7 @@ import { Select } from '../UI/Select';
 import { Badge } from '../UI/Badge';
 import { User } from '../../types';
 import { can } from '../../config/permissions';
+import { roleLabel } from '../../config/roles';
 
 interface SettingsViewProps {
   currentUser?: User;
@@ -38,18 +39,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-              Governance Engine & Policy Settings
+            <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+              Settings
             </h1>
             <Badge
               variant={isAdmin ? 'info' : 'warning'}
               size="sm"
             >
-              {isAdmin ? 'ADMIN AUTHORIZED' : 'READ-ONLY ACCESS'}
+              {isAdmin ? 'Admin authorized' : 'Read-only access'}
             </Badge>
           </div>
-          <p className="text-xs text-[#94A3B8]">
-            Configure compliance review thresholds, SLA targets, and enforcement strictness.
+          <p className="text-sm leading-5 text-[#4B5869]">
+            Review the available review and policy controls.
           </p>
         </div>
 
@@ -69,13 +70,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
         <div className="p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-xs text-[#F59E0B] flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <span className="font-bold uppercase tracking-wider font-mono">
+            <span className="font-semibold">
               Role-Based Access Control Notice
             </span>
             <p className="text-[#F8FAFC]/90 leading-relaxed">
               You are signed in as <strong>{currentUser?.name}</strong> with role{' '}
-              <span className="font-semibold uppercase text-[#F59E0B]">{currentUser?.role}</span>.
-              Only an organisation admin can change these controls in the interface. You can read them. Saving does not call a backend settings endpoint.
+              <span className="font-semibold text-[#F59E0B]">
+                {currentUser ? roleLabel(currentUser.role) : 'Unknown'}
+              </span>.
+              Only an Admin can change these controls in the interface. You can read them. Saving does not call a backend settings endpoint.
             </p>
           </div>
         </div>

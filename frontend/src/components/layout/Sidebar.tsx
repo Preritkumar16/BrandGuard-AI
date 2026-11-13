@@ -16,10 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
-  Shield,
-  Users,
   Upload,
-  ScrollText,
   Menu,
   X,
 } from 'lucide-react';
@@ -44,20 +41,12 @@ interface SidebarProps {
 const ICONS: Record<string, React.ReactNode> = {
   dashboard: <LayoutDashboard className="h-4 w-4" />,
   assets: <FileText className="h-4 w-4" />,
-  users: <Users className="h-4 w-4" />,
-  roles: <Shield className="h-4 w-4" />,
   sources: <BookOpen className="h-4 w-4" />,
   activity: <History className="h-4 w-4" />,
   settings: <Sliders className="h-4 w-4" />,
   submit: <Upload className="h-4 w-4" />,
   'asset-workspace': <FileText className="h-4 w-4" />,
   queue: <Inbox className="h-4 w-4" />,
-  findings: <ShieldCheck className="h-4 w-4" />,
-  reports: <ScrollText className="h-4 w-4" />,
-  'source-upload': <Upload className="h-4 w-4" />,
-  'source-detail': <BookOpen className="h-4 w-4" />,
-  'source-history': <History className="h-4 w-4" />,
-  feedback: <ScrollText className="h-4 w-4" />,
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -97,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed bottom-0 left-0 top-0 z-40 flex w-64 flex-col border-r border-[#253047] bg-[#0D1220] transition-transform duration-200 ${
+        className={`fixed bottom-0 left-0 top-0 z-40 flex w-64 flex-col border-r border-[#DCE2E9] bg-white shadow-sm transition-transform duration-200 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
       >
@@ -164,13 +153,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         title={collapsed ? item.label : undefined}
                         className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium ${
                           active
-                            ? 'border border-[#253047] bg-[#161E2E] text-[#F8FAFC]'
-                            : 'text-[#94A3B8] hover:bg-[#161E2E]/60 hover:text-[#F8FAFC]'
+                            ? 'border border-[#C9D8EA] bg-[#EEF4FA] text-[#1B2533] shadow-sm'
+                            : 'text-[#4B5869] hover:bg-[#F4F6F9] hover:text-[#1B2533]'
                         }`}
                       >
                         <span
                           className={
-                            active ? 'text-[#6366F1]' : 'text-[#64748B]'
+                            active ? 'text-[#315EA8]' : 'text-[#64748B]'
                           }
                         >
                           {ICONS[item.id] ?? (
@@ -251,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>
                     <span className="block text-[#F8FAFC]">{user.name}</span>
                     <span className="block text-[10px] text-[#64748B]">
-                      {user.title}
+                      {roleLabel(user.role)}
                     </span>
                   </span>
 

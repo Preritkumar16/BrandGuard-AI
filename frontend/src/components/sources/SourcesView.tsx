@@ -115,18 +115,18 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-            Authoritative Brand Sources & Guidelines
+          <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+            Brand Guidelines
           </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Product Rule 1 & 7: Ratified brand guidelines with indexed evidence passages powering deterministic compliance inspection.
+          <p className="mt-1 text-sm leading-5 text-[#4B5869]">
+            Browse approved guidance, source documents, and their versions.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {currentUser && !can(currentUser, 'upload_source').allowed && (
-            <span className="text-[11px] text-[#F59E0B] font-mono hidden md:inline">
-              Source upload is limited to source owners and organisation admins
+            <span className="text-xs text-[#F59E0B] hidden md:inline">
+              Source upload is limited to Brand Managers and Admins
             </span>
           )}
           <Button
@@ -188,7 +188,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Sources List (Left 5 Cols) */}
         <div className="lg:col-span-5 space-y-3">
-          <div className="text-[10px] uppercase font-mono tracking-wider text-[#64748B] px-1 flex items-center justify-between">
+          <div className="text-xs font-medium text-[#64748B] px-1 flex items-center justify-between">
             <span>Registered Policy Documents ({filteredSources.length})</span>
             <span>Click to Inspect</span>
           </div>
@@ -212,7 +212,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[10px] uppercase font-mono text-[#818CF8] bg-[#6366F1]/10 px-2 py-0.5 rounded border border-[#6366F1]/20 font-semibold">
+                    <span className="text-xs font-semibold text-[#818CF8] bg-[#6366F1]/10 px-2 py-0.5 rounded border border-[#6366F1]/20">
                       {source.category.replace('_', ' ')}
                     </span>
                     <div className="flex items-center gap-1.5">
@@ -277,7 +277,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   <span className="text-xs font-semibold text-[#F8FAFC]">
                     Indexed Passages & Evidence Anchors ({activeSource.versions[0]?.passages.length || 0})
                   </span>
-                  <span className="text-[11px] text-[#64748B] font-mono">
+                  <span className="text-xs text-[#64748B]">
                     Deterministic Pattern Index
                   </span>
                 </div>
@@ -293,7 +293,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                           {passage.rule_title}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#818CF8]">
+                          <span className="text-xs px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#818CF8]">
                             {passage.rule_type.replace('_', ' ')}
                           </span>
                           <button
@@ -314,7 +314,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                         {passage.section}
                       </div>
 
-                      <div className="text-xs text-[#94A3B8] font-mono bg-[#111827] p-3 rounded border border-[#253047] leading-relaxed">
+                      <div className="text-sm text-[#94A3B8] bg-[#111827] p-3 rounded border border-[#253047] leading-relaxed">
                         "{passage.text}"
                       </div>
                     </div>
@@ -329,7 +329,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   <p className="leading-relaxed">
                     {activeSource.versions[0]?.changelog || 'Authoritative brand rules ratified by stewardship committee.'}
                   </p>
-                  <div className="text-[11px] font-mono pt-1 text-[#64748B]">
+                  <div className="text-xs pt-1 text-[#64748B]">
                     Effective Date: {activeSource.versions[0]?.effective_date} • Ratified by {activeSource.versions[0]?.created_by}
                   </div>
                 </div>

@@ -76,7 +76,7 @@ export const NewAssetModal: React.FC<NewAssetModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Submit Content for Brand Governance"
+      title="Submit Content"
       description="Register an outbound communication asset. Version v1.0 will be immutably preserved."
       maxWidth="xl"
       footer={

@@ -153,8 +153,8 @@ export const ComplianceHealthModal: React.FC<ComplianceHealthModalProps> = ({
         </div>
 
         {/* Audit Engine Telemetry */}
-        <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] text-[11px] text-[#94A3B8] font-mono space-y-1">
-          <div className="text-[#F8FAFC] font-semibold">Audit Engine Telemetry (bg-sentinel-engine-4.1.0)</div>
+        <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] text-xs text-[#94A3B8] space-y-1">
+          <div className="text-[#F8FAFC] font-semibold">Audit engine telemetry (<span className="font-mono">bg-sentinel-engine-4.1.0</span>)</div>
           <div>• Latency: 12ms deterministic rule pass</div>
           <div>• Passage Coverage: 100% of ratified brand policies active</div>
           <div>• Strictness: Enterprise Standard (zero-tolerance on statutory breaches)</div>

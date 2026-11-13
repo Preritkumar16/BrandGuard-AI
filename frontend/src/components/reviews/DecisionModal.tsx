@@ -192,8 +192,8 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
           error={error || undefined}
         />
 
-        <div className="text-[11px] text-[#64748B] font-mono">
-          Reviewer: <span className="text-[#94A3B8]">{currentUser.name} ({currentUser.title})</span> • Cryptographically recorded on approval ledger.
+        <div className="text-xs text-[#64748B]">
+          Reviewer: <span className="text-[#94A3B8]">{currentUser.name} ({roleLabel(currentUser.role)})</span> • Cryptographically recorded on approval ledger.
         </div>
       </div>
     </Modal>

@@ -10,6 +10,19 @@ import { apiFetch } from './client';
 
 let inMemoryAssets: Asset[] = [...MOCK_ASSETS];
 
+export function isAssetOwnedBy(asset: Asset, userId: string): boolean {
+  return asset.created_by.id === userId
+    || asset.versions.some(version => version.created_by.id === userId);
+}
+
+export function canCreatorOpenAssetDetails(
+  asset: Asset,
+  userId: string,
+  fromSubmissionsList: boolean
+): boolean {
+  return fromSubmissionsList && isAssetOwnedBy(asset, userId);
+}
+
 export const assetsService = {
   async getAssets(): Promise<Asset[]> {
     try {

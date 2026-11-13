@@ -6,7 +6,7 @@
 import { User, UserRole, PermissionAction, RolePermissions } from '../../types';
 import { MOCK_USERS } from './mockData';
 import { apiFetch } from './client';
-import { ROLE_META, normalizeRole } from '../../config/roles';
+import { ROLE_META, normalizeRole, roleLabel } from '../../config/roles';
 import { ROLE_PERMISSIONS, can } from '../../config/permissions';
 
 const SUPPORT_KEY = 'bg_role_supported';
@@ -33,7 +33,7 @@ export const ROLE_DEFINITIONS: Record<UserRole, RolePermissions> = {
 const SESSION_KEY = 'bg_session_user';
 const AUTH_KEY = 'bg_is_authenticated';
 
-// Load stored session or default to Marcus Vance
+// Load stored session or default to Ananya Mehta
 const rememberRoleSupport = (supported: boolean) => {
   try {
     localStorage.setItem(SUPPORT_KEY, supported ? 'true' : 'false');
@@ -51,7 +51,20 @@ const applyRole = (user: User): User => {
 const getStoredUser = (): User => {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    if (raw) return applyRole(JSON.parse(raw) as User);
+    if (raw) {
+      const storedUser = JSON.parse(raw) as User;
+      const demoUser = MOCK_USERS.find(
+        user => user.id === storedUser.id && user.role === storedUser.role,
+      );
+      if (!demoUser) return applyRole(storedUser);
+      return applyRole({
+        ...storedUser,
+        name: demoUser.name,
+        email: demoUser.email,
+        title: demoUser.title,
+        avatar: demoUser.avatar,
+      });
+    }
   } catch {
     /* fall through to the default reviewer persona */
   }
@@ -91,7 +104,7 @@ export const authService = {
         name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase()),
         email,
         role: 'creator' as UserRole,
-        title: 'Marketing Specialist',
+        title: roleLabel('creator'),
       };
       currentUser = applyRole(matched);
       authenticated = true;
@@ -118,7 +131,7 @@ export const authService = {
         name: payload.name,
         email: payload.email,
         role: payload.role,
-        title: payload.title || 'Brand Governance Member',
+        title: payload.title || roleLabel(payload.role),
         avatar: payload.name.slice(0, 2).toUpperCase(),
       };
       MOCK_USERS.push(newUser);
