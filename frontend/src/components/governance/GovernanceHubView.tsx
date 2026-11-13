@@ -39,7 +39,7 @@ import {
   ReviewRequiredItem,
   ApprovalVerificationResult,
   SpecialistModuleStatus,
-} from '../../services/api/governanceService';
+} from '../../services/API/governanceService';
 
 interface GovernanceHubViewProps {
   sources: BrandSource[];

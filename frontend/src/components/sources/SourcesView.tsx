@@ -13,7 +13,7 @@ import { Modal } from '../UI/Modal';
 import { Input, Textarea } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { NewSourceModal } from './NewSourceModal';
-import { sourcesService } from '../../services/api/sourcesService';
+import { sourcesService } from '../../services/API/sourcesService';
 import { can } from '../../config/permissions';
 
 interface SourcesViewProps {
@@ -201,10 +201,11 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
             filteredSources.map(source => {
               const isSelected = activeSource?.id === source.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={source.id}
                   onClick={() => setActiveSourceId(source.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                  className={`w-full p-4 rounded-xl border text-left transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-[#161E2E] border-[#6366F1] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
                       : 'bg-[#111827] border-[#253047] hover:border-[#3B4866]'
@@ -234,7 +235,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                     <span>{source.passage_count} Verified Passages</span>
                     <span className="font-mono">{new Date(source.updated_at).toLocaleDateString()}</span>
                   </div>
-                </div>
+                </button>
               );
             })
           )}

@@ -97,10 +97,11 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
             const isCreatorConflict = currentUser.id === item.creator.id;
 
             return (
-              <div
+              <button
+                type="button"
                 key={item.version_id}
                 onClick={() => onSelectQueueItem(item.asset_id)}
-                className="p-5 rounded-xl bg-[#111827] border border-[#253047] hover:border-[#3B4866] transition-all cursor-pointer space-y-4 group"
+                className="w-full p-5 rounded-xl bg-[#111827] border border-[#253047] text-left hover:border-[#3B4866] transition-colors cursor-pointer space-y-4 group"
               >
                 {/* Header row */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -161,7 +162,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                     <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })
         )}

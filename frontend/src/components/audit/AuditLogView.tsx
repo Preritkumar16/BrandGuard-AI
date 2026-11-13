@@ -124,10 +124,11 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       <Card>
         <div className="divide-y divide-[#253047]/60">
           {filteredEvents.map(event => (
-            <div
+            <button
+              type="button"
               key={event.id}
               onClick={() => onSelectAsset(event.assetId)}
-              className="p-4 hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+              className="w-full p-4 text-left hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
             >
               <div className="flex items-start gap-3">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
@@ -176,7 +177,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                   <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </Card>

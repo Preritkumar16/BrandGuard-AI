@@ -87,9 +87,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* KPI Analytical Cards (All Clickable) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Compliance Rate */}
-        <div
+        <button
+          type="button"
           onClick={onOpenComplianceHealth}
-          className="p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 hover:border-[#6366F1] transition-all cursor-pointer group"
+          className="w-full p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 text-left hover:border-[#6366F1] transition-colors cursor-pointer group"
           title="Click to view detailed compliance index breakdown"
         >
           <div className="flex items-center justify-between">
@@ -109,12 +110,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </span>
             <span className="text-[#818CF8] group-hover:underline text-[10px]">Inspect ➔</span>
           </div>
-        </div>
+        </button>
 
         {/* Metric 2: Pending Human Review */}
-        <div
+        <button
+          type="button"
           onClick={onNavigateToQueue}
-          className="p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 hover:border-[#F59E0B] transition-colors cursor-pointer group"
+          className="w-full p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 text-left hover:border-[#F59E0B] transition-colors cursor-pointer group"
           title="Click to open Human Review Queue"
         >
           <div className="flex items-center justify-between">
@@ -132,12 +134,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span>Average turnaround: 4.2h</span>
             <span className="text-[#818CF8] group-hover:underline text-[10px]">Review ➔</span>
           </div>
-        </div>
+        </button>
 
         {/* Metric 3: Governed Assets */}
-        <div
+        <button
+          type="button"
           onClick={onNavigateToAssets}
-          className="p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 hover:border-[#3B4866] transition-colors cursor-pointer group"
+          className="w-full p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 text-left hover:border-[#3B4866] transition-colors cursor-pointer group"
           title="Click to view Asset Repository"
         >
           <div className="flex items-center justify-between">
@@ -155,12 +158,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span>Immutable version trees</span>
             <span className="text-[#818CF8] group-hover:underline text-[10px]">Catalog ➔</span>
           </div>
-        </div>
+        </button>
 
         {/* Metric 4: Ratified Brand Sources */}
-        <div
+        <button
+          type="button"
           onClick={() => onNavigateToSources()}
-          className="p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 hover:border-[#6366F1] transition-colors cursor-pointer group"
+          className="w-full p-4 rounded-xl bg-[#111827] border border-[#253047] space-y-2 text-left hover:border-[#6366F1] transition-colors cursor-pointer group"
           title="Click to view Brand Sources"
         >
           <div className="flex items-center justify-between">
@@ -178,7 +182,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span>100% Policy Consensus</span>
             <span className="text-[#818CF8] group-hover:underline text-[10px]">Sources ➔</span>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Main Grid: Urgent Queue & Category Health */}
@@ -210,10 +214,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
               ) : (
                 queue.slice(0, 3).map(item => (
-                  <div
+                  <button
+                    type="button"
                     key={item.version_id}
                     onClick={() => onSelectAsset(item.asset_id)}
-                    className="p-4 hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                    className="w-full p-4 text-left hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -236,7 +241,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       <Badge status={item.status} size="sm" />
                       <ArrowRight className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#F8FAFC] group-hover:translate-x-0.5 transition-all" />
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
@@ -256,10 +261,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {assets.map(asset => {
                 const latest = asset.versions[asset.versions.length - 1];
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={asset.id}
                     onClick={() => onSelectAsset(asset.id)}
-                    className="p-4 hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex items-center justify-between gap-3 group"
+                    className="w-full p-4 text-left hover:bg-[#161E2E]/50 transition-colors cursor-pointer flex items-center justify-between gap-3 group"
                   >
                     <div className="space-y-0.5 truncate">
                       <div className="text-xs font-semibold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors truncate">
@@ -278,7 +284,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       <Badge status={asset.current_status} size="sm" />
                       <ArrowRight className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#F8FAFC] transition-colors" />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -305,9 +311,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
             </CardHeader>
             <CardBody className="p-4 space-y-4">
-              <div
+              <button
+                type="button"
                 onClick={() => onNavigateToSources('legal')}
-                className="space-y-1.5 p-2 rounded-lg hover:bg-[#161E2E] transition-colors cursor-pointer group"
+                className="w-full space-y-1.5 p-2 rounded-lg text-left hover:bg-[#161E2E] transition-colors cursor-pointer group"
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[#94A3B8] group-hover:text-[#F8FAFC]">Legal & Disclaimers</span>
@@ -316,11 +323,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="w-full h-1.5 bg-[#0D1220] rounded-full overflow-hidden border border-[#253047]">
                   <div className="h-full bg-[#10B981] rounded-full" style={{ width: '98.2%' }} />
                 </div>
-              </div>
+              </button>
 
-              <div
+              <button
+                type="button"
                 onClick={() => onNavigateToSources('trademark')}
-                className="space-y-1.5 p-2 rounded-lg hover:bg-[#161E2E] transition-colors cursor-pointer group"
+                className="w-full space-y-1.5 p-2 rounded-lg text-left hover:bg-[#161E2E] transition-colors cursor-pointer group"
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[#94A3B8] group-hover:text-[#F8FAFC]">Trademark & Marks</span>
@@ -329,11 +337,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="w-full h-1.5 bg-[#0D1220] rounded-full overflow-hidden border border-[#253047]">
                   <div className="h-full bg-[#6366F1] rounded-full" style={{ width: '95%' }} />
                 </div>
-              </div>
+              </button>
 
-              <div
+              <button
+                type="button"
                 onClick={() => onNavigateToSources('tone_voice')}
-                className="space-y-1.5 p-2 rounded-lg hover:bg-[#161E2E] transition-colors cursor-pointer group"
+                className="w-full space-y-1.5 p-2 rounded-lg text-left hover:bg-[#161E2E] transition-colors cursor-pointer group"
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[#94A3B8] group-hover:text-[#F8FAFC]">Tone & Superlatives</span>
@@ -342,11 +351,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="w-full h-1.5 bg-[#0D1220] rounded-full overflow-hidden border border-[#253047]">
                   <div className="h-full bg-[#F59E0B] rounded-full" style={{ width: '91.4%' }} />
                 </div>
-              </div>
+              </button>
 
-              <div
+              <button
+                type="button"
                 onClick={() => onNavigateToSources('security')}
-                className="space-y-1.5 p-2 rounded-lg hover:bg-[#161E2E] transition-colors cursor-pointer group"
+                className="w-full space-y-1.5 p-2 rounded-lg text-left hover:bg-[#161E2E] transition-colors cursor-pointer group"
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[#94A3B8] group-hover:text-[#F8FAFC]">Data Security Claims</span>
@@ -355,7 +365,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="w-full h-1.5 bg-[#0D1220] rounded-full overflow-hidden border border-[#253047]">
                   <div className="h-full bg-[#10B981] rounded-full" style={{ width: '99%' }} />
                 </div>
-              </div>
+              </button>
 
               <div className="pt-3 border-t border-[#253047] text-[11px] text-[#64748B] leading-relaxed flex justify-between items-center">
                 <span>Audited against active sources</span>
@@ -370,9 +380,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </Card>
 
           {/* Product Governance Rules Card (Clickable to open explainer modal) */}
-          <div
+          <button
+            type="button"
             onClick={onOpenPolicyRules}
-            className="p-4 rounded-xl bg-[#0D1220] border border-[#253047] hover:border-[#6366F1] transition-colors cursor-pointer space-y-2 text-xs group"
+            className="w-full p-4 rounded-xl bg-[#0D1220] border border-[#253047] hover:border-[#6366F1] transition-colors cursor-pointer space-y-2 text-left text-xs group"
             title="Click to view all 12 core governance rules"
           >
             <div className="flex items-center justify-between">
@@ -390,7 +401,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="text-[10px] text-[#818CF8] group-hover:underline pt-1">
               Inspect all 12 platform rules ➔
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </div>

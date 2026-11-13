@@ -10,7 +10,7 @@ import { Modal } from '../UI/Modal';
 import { Input, Textarea } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { Button } from '../UI/Button';
-import { sourcesService } from '../../services/api/sourcesService';
+import { sourcesService } from '../../services/API/sourcesService';
 
 interface NewSourceModalProps {
   isOpen: boolean;

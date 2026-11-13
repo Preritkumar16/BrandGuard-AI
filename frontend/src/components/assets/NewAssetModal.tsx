@@ -9,8 +9,8 @@ import { Modal } from '../UI/Modal';
 import { Input, Textarea } from '../UI/Input';
 import { Select } from '../UI/Select';
 import { Button } from '../UI/Button';
-import { assetsService } from '../../services/api/assetsService';
-import { auditService } from '../../services/api/auditService';
+import { assetsService } from '../../services/API/assetsService';
+import { auditService } from '../../services/API/auditService';
 
 interface NewAssetModalProps {
   isOpen: boolean;

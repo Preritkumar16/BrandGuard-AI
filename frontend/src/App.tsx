@@ -23,7 +23,7 @@ import { ComplianceHealthModal } from './components/common/ComplianceHealthModal
 import { PolicyRulesModal } from './components/common/PolicyRulesModal';
 import { Modal } from './components/UI/Modal';
 import { Input } from './components/UI/Input';
-import { Asset, BrandSource, ReviewQueueItem, User, UserRole } from './types';
+import { Asset, BrandSource, ReviewQueueItem, User } from './types';
 import { authService } from './services/API/authService';
 import { assetsService } from './services/API/assetsService';
 import { sourcesService } from './services/API/sourcesService';
@@ -31,7 +31,7 @@ import { reviewsService } from './services/API/reviewsService';
 import { auditService } from './services/API/auditService';
 import { performGlobalSearch } from './services/API/searchService';
 import { Search, FileText, BookOpen, AlertCircle } from 'lucide-react';
-import { AppScreen, navigationFor } from './config/navigation';
+import { AppScreen, NavItem, navigationFor } from './config/navigation';
 
 
 // Tabs used by the main application content.
@@ -48,7 +48,7 @@ type NavTab =
 // Maps Sidebar screen identifiers to the tabs rendered by App.
 const SCREEN_TO_TAB: Partial<Record<AppScreen, NavTab>> = {
   dashboard: 'dashboard',
-   assets: 'assets',
+  assets: 'assets',
   sources: 'sources',
   queue: 'queue',
   settings: 'settings',
@@ -61,6 +61,17 @@ const SCREEN_TO_TAB: Partial<Record<AppScreen, NavTab>> = {
   'source-history': 'sources',
   feedback: 'queue',
 };
+
+function navigationItemsFor(role: User['role']): NavItem[] {
+  const seenDestinations = new Set<string>();
+
+  return navigationFor(role).filter(item => {
+    const destination = item.id === 'submit' ? 'submit' : SCREEN_TO_TAB[item.id];
+    if (!destination || seenDestinations.has(destination)) return false;
+    seenDestinations.add(destination);
+    return true;
+  });
+}
 
 // Keeps the Sidebar's selected screen in sync with the active App tab.
 function getScreenForTab(tab: NavTab): AppScreen {
@@ -196,7 +207,7 @@ export default function App() {
       case 'asset-detail': {
         const found = assets.find(a => a.id === selectedAssetId);
         return [
-          { label: 'Marketing Content Inventory', tab: 'assets' },
+          { label: 'Marketing Content Inventory', screen: 'assets' },
           { label: found ? found.title : 'Asset Inspection' },
         ];
       }
@@ -251,15 +262,18 @@ export default function App() {
     <div className="min-h-screen bg-[#0B0F19] text-[#F8FAFC]">
       {/* Sidebar Navigation Rail */}
       <Sidebar
-        items={navigationFor(currentUser.role as UserRole).filter(item =>
-          Boolean(SCREEN_TO_TAB[item.id])
-        )}
+        items={navigationItemsFor(currentUser.role)}
         currentScreen={getScreenForTab(currentTab)}
         onSelectScreen={(screen: AppScreen) => {
+          if (screen === 'submit') {
+            setNewAssetModalOpen(true);
+            setMobileSidebarOpen(false);
+            return;
+          }
+
           const nextTab = SCREEN_TO_TAB[screen];
-          
           if (!nextTab) return;
-          
+
           setCurrentTab(nextTab);
           setMobileSidebarOpen(false);
 
@@ -275,30 +289,30 @@ export default function App() {
         }
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
-        onLogout={handleLogout}
-        roleSupported={true}
-/>
-
+        roleSupported={authService.isCurrentRoleSupported()}
+      />
 
       {/* Persistent Header */}
       <Header
         breadcrumbs={getBreadcrumbs()}
-        onNavigateTab={tab => setCurrentTab(tab)}
-        onNewAssetClick={() => setNewAssetModalOpen(true)}
+        onNavigate={screen => {
+          const nextTab = SCREEN_TO_TAB[screen];
+          if (nextTab) setCurrentTab(nextTab);
+        }}
         collapsed={sidebarCollapsed}
         onSearchClick={() => setSearchModalOpen(true)}
+        onOpenRbacModal={() => setRbacModalOpen(true)}
         onNotificationsClick={() => setNotificationsOpen(true)}
         unreadNotificationsCount={notifications.filter(n => !n.read).length}
         currentUser={currentUser}
-        onOpenRbacModal={() => setRbacModalOpen(true)}
         onLogout={handleLogout}
-        currentTab={currentTab}
+        onOpenMobileNav={() => setMobileSidebarOpen(true)}
       />
 
       {/* Main Content Area */}
       <main
-        className={`pt-20 pb-12 px-6 transition-all duration-200 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        className={`ml-0 pt-20 pb-12 px-4 sm:px-6 transition-all duration-200 ${
+          sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
         }`}
       >
         <div className="max-w-[1560px] mx-auto">
@@ -442,7 +456,6 @@ export default function App() {
       <RbacMatrixModal
         isOpen={rbacModalOpen}
         onClose={() => setRbacModalOpen(false)}
-        currentRole={currentUser.role}
       />
 
       {/* Comprehensive Enterprise Search Engine (⌘K) */}

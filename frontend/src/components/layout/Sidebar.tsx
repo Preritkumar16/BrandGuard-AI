@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { User } from '../../types';
-import { authService } from '../../services/api/authService';
+import { authService } from '../../services/API/authService';
 import { AppScreen, NavItem } from '../../config/navigation';
 import { roleLabel } from '../../config/roles';
 
@@ -38,7 +38,6 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  onLogout?: () => void;
   roleSupported?: boolean;
 }
 
@@ -71,7 +70,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   mobileOpen,
   onCloseMobile,
-  onLogout,
   roleSupported = true,
 }) => {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -92,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {mobileOpen && (
         <button
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
           aria-label="Close navigation"
           onClick={onCloseMobile}
         />
@@ -105,7 +103,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         <div className="flex h-16 items-center justify-between border-b border-[#253047] px-4">
           <button
+            type="button"
             onClick={() => onSelectScreen('dashboard')}
+            aria-label="BrandGuard AI home"
             className="flex min-w-0 items-center gap-3 text-left"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#6366F1]/30 bg-[#6366F1]/10 text-[#6366F1]">
@@ -140,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-3 overflow-y-auto p-3">
+        <nav aria-label="Main navigation" className="flex-1 space-y-3 overflow-y-auto p-3">
           {sections.map(section => (
             <div key={section}>
               {!collapsed && (
@@ -157,10 +157,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     return (
                       <button
+                        type="button"
                         key={item.id}
                         onClick={() => onSelectScreen(item.id)}
+                        aria-current={active ? 'page' : undefined}
                         title={collapsed ? item.label : undefined}
-                        className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium ${
+                        className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium ${
                           active
                             ? 'border border-[#253047] bg-[#161E2E] text-[#F8FAFC]'
                             : 'text-[#94A3B8] hover:bg-[#161E2E]/60 hover:text-[#F8FAFC]'
@@ -195,7 +197,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           <button
+            type="button"
             onClick={() => setUserDropdownOpen(open => !open)}
+            aria-expanded={userDropdownOpen && !collapsed}
+            aria-haspopup="menu"
             className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#253047] bg-[#111827] p-2"
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -222,13 +227,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           {userDropdownOpen && !collapsed && (
-            <div className="absolute bottom-16 left-3 right-3 z-50 space-y-1 rounded-lg border border-[#253047] bg-[#161E2E] p-1 shadow-xl">
+            <div role="menu" className="absolute bottom-16 left-3 right-3 z-50 space-y-1 rounded-lg border border-[#253047] bg-[#161E2E] p-1 shadow-lg">
               <p className="border-b border-[#253047] px-2 py-1 text-[10px] uppercase text-[#64748B]">
                 Preview persona
               </p>
 
               {availableUsers.map(user => (
                 <button
+                  type="button"
+                  role="menuitem"
                   key={user.id}
                   onClick={async () => {
                     const switched = await authService.switchUser(user.id);
@@ -262,14 +269,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </p>
           )}
 
-          {!collapsed && onLogout && (
-            <button
-              onClick={onLogout}
-              className="mt-2 text-[11px] text-[#94A3B8] hover:text-[#FB7185]"
-            >
-              Sign out
-            </button>
-          )}
         </div>
       </aside>
     </>
@@ -281,6 +280,7 @@ export const MobileMenuButton: React.FC<{ onClick: () => void }> = ({
 }) => {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#253047] bg-[#111827] text-[#94A3B8] lg:hidden"
       aria-label="Open navigation"
