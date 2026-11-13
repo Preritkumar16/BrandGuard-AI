@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import { Search, Filter, Plus, ArrowRight, Layers, FileText, X } from 'lucide-react';
-import { Asset, ComplianceStatus } from '../../types';
+import { Asset, User } from '../../types';
+import { isAssetOwnedBy } from '../../services/API/assetsService';
 import { Badge } from '../UI/Badge';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
@@ -13,12 +14,14 @@ import { Select } from '../UI/Select';
 
 interface AssetListViewProps {
   assets: Asset[];
+  currentUser: User;
   onSelectAsset: (assetId: string) => void;
   onNewAssetClick: () => void;
 }
 
 export const AssetListView: React.FC<AssetListViewProps> = ({
   assets,
+  currentUser,
   onSelectAsset,
   onNewAssetClick,
 }) => {
@@ -26,7 +29,10 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const filteredAssets = assets.filter(asset => {
+  const visibleAssets = currentUser.role === 'creator'
+    ? assets.filter(asset => isAssetOwnedBy(asset, currentUser.id))
+    : assets;
+  const filteredAssets = visibleAssets.filter(asset => {
     const matchesSearch =
       asset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (asset.campaign && asset.campaign.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -42,11 +48,11 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#F8FAFC]">
-            Asset Repository
+          <h1 className="text-2xl font-semibold tracking-tight text-[#F8FAFC] md:text-[1.75rem]">
+            Asset Library
           </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Authoritative registry of marketing assets, immutable version branches, and audit histories.
+          <p className="mt-1 text-sm leading-5 text-[#4B5869]">
+            Browse submitted content, versions, and review status.
           </p>
         </div>
 
@@ -117,15 +123,15 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
       {/* Asset Table */}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table aria-label="Assets" className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#253047] bg-[#0D1220]/70 text-[10px] font-mono uppercase tracking-wider text-[#64748B]">
-                <th className="py-3 px-5">Asset Details</th>
-                <th className="py-3 px-4">Channel</th>
-                <th className="py-3 px-4">Latest Version</th>
-                <th className="py-3 px-4">Governance Status</th>
-                <th className="py-3 px-4">Author</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="border-b border-[#253047] bg-[#0D1220]/70 text-xs font-medium text-[#64748B]">
+                <th scope="col" className="py-3 px-5">Asset Details</th>
+                <th scope="col" className="py-3 px-4">Channel</th>
+                <th scope="col" className="py-3 px-4">Latest Version</th>
+                <th scope="col" className="py-3 px-4">Governance Status</th>
+                <th scope="col" className="py-3 px-4">Author</th>
+                <th scope="col" className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#253047]/60 text-xs text-[#94A3B8]">
@@ -141,19 +147,22 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
                   return (
                     <tr
                       key={asset.id}
-                      onClick={() => onSelectAsset(asset.id)}
-                      className="hover:bg-[#161E2E]/50 transition-colors cursor-pointer group"
+                      className="hover:bg-[#161E2E]/50 transition-colors group"
                     >
                       <td className="py-4 px-5">
-                        <div className="font-semibold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors truncate max-w-md">
+                        <button
+                          type="button"
+                          onClick={() => onSelectAsset(asset.id)}
+                          className="max-w-md truncate text-left font-semibold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors"
+                        >
                           {asset.title}
-                        </div>
+                        </button>
                         <div className="text-[11px] text-[#64748B] mt-0.5 truncate">
                           {asset.campaign || 'Global Communications'}
                         </div>
                       </td>
 
-                      <td className="py-4 px-4 font-mono text-[11px] uppercase">
+                      <td className="py-4 px-4 text-xs">
                         <span className="px-2 py-0.5 rounded bg-[#161E2E] border border-[#253047] text-[#94A3B8]">
                           {asset.channel.replace('_', ' ')}
                         </span>
@@ -179,6 +188,7 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
 
                       <td className="py-4 px-4 text-right">
                         <button
+                          type="button"
                           onClick={e => {
                             e.stopPropagation();
                             onSelectAsset(asset.id);

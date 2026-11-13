@@ -6,9 +6,61 @@
 import { Asset, AssetVersion } from '../../types';
 import { MOCK_ASSETS } from './mockData';
 import { authService } from './authService';
-import { apiFetch } from './client';
+import { ApiError, apiFetch } from './client';
 
 let inMemoryAssets: Asset[] = [...MOCK_ASSETS];
+
+export interface CreatedAssetResult {
+  asset: Asset;
+  source: 'api';
+}
+
+function isAssetWithCurrentVersion(value: unknown): value is Asset {
+  if (!value || typeof value !== 'object') return false;
+  const asset = value as Partial<Asset>;
+  return typeof asset.id === 'string'
+    && asset.id.length > 0
+    && typeof asset.title === 'string'
+    && asset.title.length > 0
+    && typeof asset.created_by?.id === 'string'
+    && typeof asset.created_at === 'string'
+    && typeof asset.updated_at === 'string'
+    && typeof asset.current_status === 'string'
+    && typeof asset.current_version_id === 'string'
+    && asset.current_version_id.length > 0
+    && Array.isArray(asset.versions)
+    && asset.versions.some(version =>
+      !!version
+      && typeof version === 'object'
+      && version.version_id === asset.current_version_id
+      && version.asset_id === asset.id
+      && typeof version.content === 'string'
+      && typeof version.version_number === 'string'
+      && typeof version.created_by?.id === 'string'
+    );
+}
+
+function cacheAsset(asset: Asset): void {
+  const index = inMemoryAssets.findIndex(item => item.id === asset.id);
+  if (index >= 0) {
+    inMemoryAssets[index] = asset;
+  } else {
+    inMemoryAssets.unshift(asset);
+  }
+}
+
+export function isAssetOwnedBy(asset: Asset, userId: string): boolean {
+  return asset.created_by.id === userId
+    || asset.versions.some(version => version.created_by.id === userId);
+}
+
+export function canCreatorOpenAssetDetails(
+  asset: Asset,
+  userId: string,
+  fromSubmissionsList: boolean
+): boolean {
+  return fromSubmissionsList && isAssetOwnedBy(asset, userId);
+}
 
 export const assetsService = {
   async getAssets(): Promise<Asset[]> {
@@ -42,44 +94,25 @@ export const assetsService = {
     channel: Asset['channel'];
     campaign?: string;
     content: string;
-  }): Promise<Asset> {
-    try {
-      return await apiFetch<Asset>('/assets', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      const currentUser = authService.getCurrentUserSync();
-      const assetId = `asset-${Date.now().toString(36)}`;
-      const versionId = `ver-${assetId}-1.0`;
-
-      const initialVersion: AssetVersion = {
-        version_id: versionId,
-        asset_id: assetId,
-        version_number: 'v1.0',
-        content: payload.content,
-        created_at: new Date().toISOString(),
-        created_by: currentUser,
-        audit_status: 'draft',
-        changelog: 'Initial version created.',
-      };
-
-      const newAsset: Asset = {
-        id: assetId,
-        title: payload.title,
-        channel: payload.channel,
-        campaign: payload.campaign || 'General Marketing',
-        created_by: currentUser,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        current_status: 'draft',
-        current_version_id: versionId,
-        versions: [initialVersion],
-      };
-
-      inMemoryAssets.unshift(newAsset);
-      return newAsset;
+  }): Promise<CreatedAssetResult> {
+    const asset = await apiFetch<unknown>('/assets', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!isAssetWithCurrentVersion(asset)) {
+      throw new ApiError(
+        'The server response was incomplete, so the save outcome is unconfirmed.',
+        200,
+        undefined,
+        'unknown'
+      );
     }
+    cacheAsset(asset);
+    return { asset, source: 'api' };
+  },
+
+  updateLocalSnapshot(asset: Asset): void {
+    cacheAsset(asset);
   },
 
   /**

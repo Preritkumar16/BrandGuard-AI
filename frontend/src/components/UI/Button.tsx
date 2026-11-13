@@ -26,31 +26,31 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-medium transition-all duration-150 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6366F1] disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98] cursor-pointer';
+    'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315EA8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 select-none cursor-pointer';
 
   const sizeClasses = {
-    sm: 'text-xs px-2.5 py-1.5 gap-1.5 h-8',
-    md: 'text-sm px-3.5 py-2 gap-2 h-9',
-    lg: 'text-sm px-4 py-2.5 gap-2.5 h-10',
+    sm: 'text-xs px-3 py-1.5 gap-1.5 h-9',
+    md: 'text-sm px-4 py-2 gap-2 h-10',
+    lg: 'text-sm px-5 py-2.5 gap-2.5 h-11',
   };
 
   const variantClasses = {
-    primary:
-      'bg-[#6366F1] text-[#F8FAFC] hover:bg-[#4F46E5] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)] hover:shadow-[0_0_16px_-2px_rgba(99,102,241,0.35)]',
+    primary: 'bg-[#315EA8] text-white hover:bg-[#274E8A]',
     secondary:
-      'bg-[#161E2E] border border-[#253047] text-[#F8FAFC] hover:border-[#6366F1] hover:bg-[#1C2638] shadow-sm',
+      'bg-white border border-[#D5DDE7] text-[#243247] hover:border-[#9AA9BC] hover:bg-[#F4F6F9]',
     ghost:
-      'bg-transparent text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#253047]/40',
+      'bg-transparent text-[#4B5869] hover:text-[#1B2533] hover:bg-[#EEF1F5]',
     outline:
-      'bg-transparent border border-[#253047] text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#6366F1] hover:bg-[#161E2E]',
+      'bg-white border border-[#D5DDE7] text-[#4B5869] hover:text-[#1B2533] hover:border-[#9AA9BC] hover:bg-[#F4F6F9]',
     destructive:
-      'bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] hover:bg-[#EF4444]/20 hover:border-[#EF4444]/50',
+      'bg-[#FEF3F2] border border-[#FECDCA] text-[#B42318] hover:bg-[#FEE4E2]',
   };
 
   return (
     <button
       className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (

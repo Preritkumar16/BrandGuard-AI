@@ -10,6 +10,8 @@ import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import { Textarea } from '../UI/Input';
 import { Badge } from '../UI/Badge';
+import { can } from '../../config/permissions';
+import { roleLabel } from '../../config/roles';
 
 interface DecisionModalProps {
   isOpen: boolean;
@@ -31,11 +33,10 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Role Checks
-  const isCreatorRole = currentUser.role === 'creator';
-  // Rule 6 Check: Creator must not approve their own content
+  const approval = can(currentUser, 'approve_asset', version.created_by.id);
+  const canDecide = can(currentUser, 'review_decision').allowed;
   const isCreatorConflict = currentUser.id === version.created_by.id;
-  const canApprove = !isCreatorRole && !isCreatorConflict;
+  const canApprove = approval.allowed;
 
   const handleSubmit = async () => {
     if (!notes.trim()) {
@@ -46,8 +47,12 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
       setError('Rule 6 Enforcement: A creator cannot approve their own content. Please assign an independent brand reviewer.');
       return;
     }
-    if (decision === 'approved' && isCreatorRole) {
-      setError('RBAC Authorization Restriction: Content Creators cannot grant formal brand compliance approval. Switch persona to Reviewer or Admin.');
+    if (!canDecide) {
+      setError(can(currentUser, 'review_decision').reason || 'This role cannot record a review decision.');
+      return;
+    }
+    if (decision === 'approved' && !canApprove) {
+      setError(approval.reason || 'This role cannot approve this asset.');
       return;
     }
 
@@ -93,27 +98,18 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
             <span className="text-[#94A3B8]">Reviewer Persona:</span>
             <span className="font-semibold text-[#F8FAFC]">{currentUser.name}</span>
           </div>
-          <Badge
-            variant={
-              currentUser.role === 'admin'
-                ? 'info'
-                : currentUser.role === 'reviewer'
-                ? 'compliant'
-                : 'warning'
-            }
-            size="sm"
-          >
-            {currentUser.role}
+          <Badge variant={canApprove ? 'compliant' : 'warning'} size="sm">
+            {roleLabel(currentUser.role)}
           </Badge>
         </div>
 
         {/* Creator Role Restriction Banner */}
-        {isCreatorRole && (
+        {!canApprove && (
           <div className="p-3 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-xs text-[#F59E0B] flex items-start gap-2.5">
             <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <strong className="block font-semibold">RBAC Restriction (Creator Role)</strong>
-              You are signed in with the <strong>Creator</strong> role. Creators are authorized to request revisions or reject content, but cannot grant formal brand compliance approvals. Switch persona to <strong>Reviewer (Marcus Vance)</strong> or <strong>Admin (Elena Rostova)</strong> to approve.
+              <strong className="block font-semibold">Approval is not available</strong>
+              {approval.reason || 'This account cannot approve this version. The backend must enforce the same restriction.'}
             </div>
           </div>
         )}
@@ -196,8 +192,8 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
           error={error || undefined}
         />
 
-        <div className="text-[11px] text-[#64748B] font-mono">
-          Reviewer: <span className="text-[#94A3B8]">{currentUser.name} ({currentUser.title})</span> • Cryptographically recorded on approval ledger.
+        <div className="text-xs text-[#64748B]">
+          Reviewer: <span className="text-[#94A3B8]">{currentUser.name} ({roleLabel(currentUser.role)})</span> • Cryptographically recorded on approval ledger.
         </div>
       </div>
     </Modal>

@@ -110,7 +110,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
             <CheckCircle className="w-3.5 h-3.5 text-[#10B981]" />
             Verbatim Passage in Approved Guideline
           </span>
-          <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] text-xs leading-relaxed text-[#F8FAFC] font-mono border-l-2 border-l-[#6366F1]">
+          <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] text-sm leading-relaxed text-[#F8FAFC] border-l-2 border-l-[#6366F1]">
             "{evidence.excerpt}"
           </div>
         </div>

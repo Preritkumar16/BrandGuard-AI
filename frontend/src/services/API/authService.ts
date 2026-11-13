@@ -6,63 +6,69 @@
 import { User, UserRole, PermissionAction, RolePermissions } from '../../types';
 import { MOCK_USERS } from './mockData';
 import { apiFetch } from './client';
+import { ROLE_META, normalizeRole, roleLabel } from '../../config/roles';
+import { ROLE_PERMISSIONS, can } from '../../config/permissions';
+
+const SUPPORT_KEY = 'bg_role_supported';
+
+function roleDefinition(role: UserRole): RolePermissions {
+  const meta = ROLE_META[role];
+  return {
+    role,
+    name: meta.name,
+    badge: meta.badge,
+    description: meta.description,
+    allowedActions: ROLE_PERMISSIONS[role],
+  };
+}
 
 export const ROLE_DEFINITIONS: Record<UserRole, RolePermissions> = {
-  creator: {
-    role: 'creator',
-    name: 'Content Creator / Marketing Specialist',
-    badge: 'Creator',
-    description: 'Submits copy and campaign assets, inspects audit findings, and drafts immutable revision branches.',
-    allowedActions: [
-      'submit_asset',
-      'draft_revision',
-      'run_audit',
-      'view_audit_log',
-    ],
-  },
-  reviewer: {
-    role: 'reviewer',
-    name: 'Brand Steward / Compliance Reviewer',
-    badge: 'Reviewer',
-    description: 'Performs formal human governance sign-offs, requests revisions, and triages the review queue. Subject to Rule 6 (cannot approve self-authored copy).',
-    allowedActions: [
-      'submit_asset',
-      'draft_revision',
-      'run_audit',
-      'review_decision',
-      'approve_asset',
-      'view_audit_log',
-      'manage_sources',
-    ],
-  },
-  admin: {
-    role: 'admin',
-    name: 'VP Brand Operations / Super Admin',
-    badge: 'Admin',
-    description: 'Full supervisory authority across brand governance: ratifies guideline sources, tunes engine strictness, and oversees SLA policies.',
-    allowedActions: [
-      'submit_asset',
-      'draft_revision',
-      'run_audit',
-      'review_decision',
-      'approve_asset',
-      'manage_sources',
-      'manage_settings',
-      'view_audit_log',
-    ],
-  },
+  admin: roleDefinition('admin'),
+  source_owner: roleDefinition('source_owner'),
+  creator: roleDefinition('creator'),
+  reviewer: roleDefinition('reviewer'),
+  compliance_reviewer: roleDefinition('compliance_reviewer'),
 };
 
 const SESSION_KEY = 'bg_session_user';
 const AUTH_KEY = 'bg_is_authenticated';
 
-// Load stored session or default to Marcus Vance
+// Load stored session or default to Ananya Mehta
+const rememberRoleSupport = (supported: boolean) => {
+  try {
+    localStorage.setItem(SUPPORT_KEY, supported ? 'true' : 'false');
+  } catch {
+    /* session flag is optional */
+  }
+};
+
+const applyRole = (user: User): User => {
+  const resolved = normalizeRole(user.role);
+  rememberRoleSupport(resolved.supported);
+  return { ...user, role: resolved.role };
+};
+
 const getStoredUser = (): User => {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return MOCK_USERS[1]; // Marcus Vance (Reviewer)
+    if (raw) {
+      const storedUser = JSON.parse(raw) as User;
+      const demoUser = MOCK_USERS.find(
+        user => user.id === storedUser.id && user.role === storedUser.role,
+      );
+      if (!demoUser) return applyRole(storedUser);
+      return applyRole({
+        ...storedUser,
+        name: demoUser.name,
+        email: demoUser.email,
+        title: demoUser.title,
+        avatar: demoUser.avatar,
+      });
+    }
+  } catch {
+    /* fall through to the default reviewer persona */
+  }
+  return MOCK_USERS[1];
 };
 
 const getStoredAuthStatus = (): boolean => {
@@ -87,21 +93,20 @@ export const authService = {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      currentUser = res.user;
+      currentUser = applyRole(res.user);
       authenticated = true;
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
       localStorage.setItem(AUTH_KEY, 'true');
       return currentUser;
     } catch {
-      // Find matching mock user by email
       const matched = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
         id: `user-${Date.now().toString(36)}`,
         name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase()),
         email,
         role: 'creator' as UserRole,
-        title: 'Marketing Specialist',
+        title: roleLabel('creator'),
       };
-      currentUser = matched;
+      currentUser = applyRole(matched);
       authenticated = true;
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
       localStorage.setItem(AUTH_KEY, 'true');
@@ -115,7 +120,7 @@ export const authService = {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      currentUser = res.user;
+      currentUser = applyRole(res.user);
       authenticated = true;
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
       localStorage.setItem(AUTH_KEY, 'true');
@@ -126,7 +131,7 @@ export const authService = {
         name: payload.name,
         email: payload.email,
         role: payload.role,
-        title: payload.title || 'Brand Governance Member',
+        title: payload.title || roleLabel(payload.role),
         avatar: payload.name.slice(0, 2).toUpperCase(),
       };
       MOCK_USERS.push(newUser);
@@ -145,9 +150,19 @@ export const authService = {
 
   async getMe(): Promise<User> {
     try {
-      return await apiFetch<User>('/auth/me');
+      currentUser = applyRole(await apiFetch<User>('/auth/me'));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      return currentUser;
     } catch {
       return currentUser;
+    }
+  },
+
+  isCurrentRoleSupported(): boolean {
+    try {
+      return localStorage.getItem(SUPPORT_KEY) !== 'false';
+    } catch {
+      return true;
     }
   },
 
@@ -187,35 +202,6 @@ export const authService = {
     user: User = currentUser,
     targetAssetCreatorId?: string
   ): { allowed: boolean; reason?: string } {
-    const roleDef = ROLE_DEFINITIONS[user.role];
-    if (!roleDef) {
-      return { allowed: false, reason: 'Unknown user role' };
-    }
-
-    // Basic action permission check
-    if (!roleDef.allowedActions.includes(action)) {
-      return {
-        allowed: false,
-        reason: `Role '${user.role.toUpperCase()}' is not authorized to perform action '${action}'. Required role: ${
-          action === 'manage_settings'
-            ? 'Admin'
-            : action === 'approve_asset'
-            ? 'Reviewer or Admin'
-            : action === 'manage_sources'
-            ? 'Reviewer or Admin'
-            : 'Authorized personnel'
-        }.`,
-      };
-    }
-
-    // Strict Rule 6 Enforcement: Creator cannot approve their own content!
-    if (action === 'approve_asset' && targetAssetCreatorId && targetAssetCreatorId === user.id) {
-      return {
-        allowed: false,
-        reason: 'Rule 6 Conflict of Interest: A creator must not approve their own content. Escalation to an independent brand steward is required.',
-      };
-    }
-
-    return { allowed: true };
+    return can(user, action, targetAssetCreatorId);
   },
 };

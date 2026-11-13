@@ -209,7 +209,7 @@ export const NewSourceModal: React.FC<NewSourceModalProps> = ({
       <div className="space-y-4">
         {/* Quick Templates Bar */}
         <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
-          <div className="text-[10px] uppercase font-mono tracking-wider text-[#64748B] flex items-center justify-between">
+          <div className="text-xs font-medium text-[#64748B] flex items-center justify-between">
             <span>Pre-populate from Enterprise Guideline Template</span>
             <span className="text-[#818CF8]">Instant Fill</span>
           </div>

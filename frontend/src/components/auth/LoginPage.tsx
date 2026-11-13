@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../../types';
 import { authService, ROLE_DEFINITIONS } from '../../services/API/authService';
+import { roleLabel } from '../../config/roles';
 import { Button } from '../UI/Button';
 import { Input } from '../UI/Input';
 import { Select } from '../UI/Select';
@@ -29,7 +30,7 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
-  const [email, setEmail] = useState('marcus.vance@brandguard.internal');
+  const [email, setEmail] = useState('ananya.mehta@brandguard.internal');
   const [password, setPassword] = useState('••••••••••••');
   const [name, setName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('creator');
@@ -72,7 +73,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         name,
         email,
         role: selectedRole,
-        title: title || (selectedRole === 'admin' ? 'Brand Administrator' : selectedRole === 'reviewer' ? 'Compliance Reviewer' : 'Marketing Specialist'),
+        title: title || roleLabel(selectedRole),
       });
       onLoginSuccess(user);
     } catch (err: unknown) {
@@ -152,10 +153,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             {/* Quick Demo Role Selector */}
             <div className="p-3.5 rounded-lg bg-[#0D1220] border border-[#253047] space-y-2">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-[#64748B] block">
-                Quick Role-Based Demo Sign-In (Select Persona):
+              <span className="text-xs font-medium text-[#64748B] block">
+                Quick sign-in
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {availableUsers.map(user => {
                   return (
                     <button
@@ -166,23 +167,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-[#F8FAFC] group-hover:text-[#6366F1] transition-colors truncate">
-                          {user.name.split(' ')[0]}
+                          {user.name}
                         </span>
-                        <Badge
-                          variant={
-                            user.role === 'admin'
-                              ? 'info'
-                              : user.role === 'reviewer'
-                              ? 'compliant'
-                              : 'warning'
-                          }
-                          size="sm"
-                        >
-                          {user.role}
+                        <Badge variant="info" size="sm">
+                          {roleLabel(user.role)}
                         </Badge>
-                      </div>
-                      <div className="text-[10px] text-[#94A3B8] truncate leading-tight">
-                        {user.title}
                       </div>
                     </button>
                   );
@@ -241,7 +230,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <Input
                   label="Full Name"
                   leftIcon={<User className="w-4 h-4" />}
-                  placeholder="e.g. Jordan Hayes"
+                  placeholder="Enter full name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   required
@@ -251,7 +240,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   label="Corporate Email"
                   type="email"
                   leftIcon={<Mail className="w-4 h-4" />}
-                  placeholder="jordan.hayes@brandguard.internal"
+                  placeholder="name@organization.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
@@ -259,18 +248,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Select
-                    label="Assigned Governance Role (RBAC)"
+                    label="Role"
                     options={[
-                      { value: 'creator', label: 'Creator (Draft & Submit Only)' },
-                      { value: 'reviewer', label: 'Reviewer (Governance Sign-off)' },
-                      { value: 'admin', label: 'Admin (Full Policy Authority)' },
+                      { value: 'creator', label: 'Creator' },
+                      { value: 'source_owner', label: 'Brand Manager' },
+                      { value: 'reviewer', label: 'Reviewer' },
+                      { value: 'compliance_reviewer', label: 'Compliance Reviewer' },
+                      { value: 'admin', label: 'Admin' },
                     ]}
                     value={selectedRole}
                     onChange={e => setSelectedRole(e.target.value as UserRole)}
                   />
                   <Input
-                    label="Job Title / Division"
-                    placeholder="e.g. Lead Brand Strategist"
+                    label="Designation (optional)"
+                    placeholder={`e.g. ${roleLabel(selectedRole)}`}
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                   />
@@ -295,7 +286,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <div className="bg-[#111827] border border-[#253047] rounded-xl p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-[#6366F1]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#F8FAFC]">
+                <h3 className="text-sm font-semibold text-[#F8FAFC]">
                   Role-Based Access Control (RBAC)
                 </h3>
               </div>
@@ -309,12 +300,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[#F8FAFC]">1. Content Creator</span>
-                    <Badge variant="warning" size="sm">CREATOR</Badge>
+                    <Badge variant="warning" size="sm">Creator</Badge>
                   </div>
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
                     Can draft copy, submit assets, and stage guideline revisions.
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#EF4444] font-mono">
+                  <div className="flex items-center gap-1.5 text-xs text-[#EF4444]">
                     <XCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>Cannot approve content or modify guidelines (Rule 6).</span>
                   </div>
@@ -324,12 +315,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[#F8FAFC]">2. Brand Reviewer</span>
-                    <Badge variant="compliant" size="sm">REVIEWER</Badge>
+                    <Badge variant="compliant" size="sm">Reviewer</Badge>
                   </div>
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
                     Can review submissions, record approvals/rejections, and manage the triage queue.
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#F59E0B] font-mono">
+                  <div className="flex items-center gap-1.5 text-xs text-[#F59E0B]">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                     <span>Forbidden from approving self-authored drafts.</span>
                   </div>
@@ -338,8 +329,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 {/* Admin */}
                 <div className="p-3 rounded-lg bg-[#0D1220] border border-[#253047] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-[#F8FAFC]">3. Brand Administrator</span>
-                    <Badge variant="info" size="sm">ADMIN</Badge>
+                    <span className="font-semibold text-[#F8FAFC]">3. Admin</span>
+                    <Badge variant="info" size="sm">Admin</Badge>
                   </div>
                   <div className="text-[11px] text-[#94A3B8] leading-normal">
                     Supervisory authority. Ratifies new guideline sources, configures SLA hours, and tunes engine sensitivity.
@@ -351,7 +342,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             {/* Security Callout */}
             <div className="p-3.5 rounded-xl bg-[#0D1220] border border-[#253047] text-[11px] text-[#64748B] flex items-center justify-between">
               <span>SOC-2 Type II Validated</span>
-              <span className="text-[#10B981] font-mono">Session Guard Active</span>
+              <span className="text-sm text-[#10B981]">Session guard active</span>
             </div>
           </div>
         </div>

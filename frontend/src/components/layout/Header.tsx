@@ -4,76 +4,73 @@
  */
 
 import React from 'react';
-import { Search, Plus, Bell, Shield, ChevronRight, LogOut, ShieldAlert, LayoutDashboard } from 'lucide-react';
-import { Button } from '../UI/Button';
+import { Search, Bell, Shield, ChevronRight, LogOut } from 'lucide-react';
 import { Badge } from '../UI/Badge';
 import { User } from '../../types';
-import { NavTab } from './Sidebar';
+import { AppScreen } from '../../config/navigation';
+import { roleLabel } from '../../config/roles';
+import { MobileMenuButton } from './Sidebar';
 
 export interface BreadcrumbItem {
   label: string;
-  tab?: NavTab;
+  screen?: AppScreen;
 }
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
-  onNavigateTab: (tab: NavTab) => void;
-  onNewAssetClick: () => void;
+  onNavigate: (screen: AppScreen) => void;
   collapsed: boolean;
   onSearchClick: () => void;
+  onOpenRbacModal?: () => void;
   onNotificationsClick: () => void;
   unreadNotificationsCount?: number;
   currentUser?: User;
-  onOpenRbacModal?: () => void;
   onLogout?: () => void;
-  currentTab?: NavTab;
+  onOpenMobileNav: () => void;
+  perspective?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   breadcrumbs,
-  onNavigateTab,
-  onNewAssetClick,
+  onNavigate,
   collapsed,
   onSearchClick,
-  onNotificationsClick,
-  unreadNotificationsCount = 2,
-  currentUser,
   onOpenRbacModal,
+  onNotificationsClick,
+  unreadNotificationsCount = 0,
+  currentUser,
   onLogout,
-  currentTab = 'dashboard',
+  onOpenMobileNav,
+  perspective,
 }) => {
   return (
     <header
-      className={`h-16 fixed top-0 right-0 z-30 bg-[#0B0F19]/90 backdrop-blur-md border-b border-[#253047] flex items-center justify-between px-6 transition-all duration-200 ${
-        collapsed ? 'left-16' : 'left-64'
+      className={`fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-[#DCE2E9] bg-white px-3 shadow-sm sm:gap-3 sm:px-4 transition-all duration-200 ${
+        collapsed ? 'lg:left-16' : 'lg:left-64'
       }`}
     >
-      {/* Clean Hierarchical Breadcrumb Navigation (Non-repetitive) */}
-      <div className="flex items-center gap-3 min-w-0">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-[#94A3B8]">
-          <div className="flex items-center gap-1.5 text-[#6366F1] font-semibold shrink-0">
-            <Shield className="w-4 h-4" />
-            <span className="hidden sm:inline font-mono text-[11px] uppercase tracking-wider text-[#818CF8]">BrandGuard</span>
-          </div>
-
+      <div className="flex min-w-0 items-center gap-2">
+        <MobileMenuButton onClick={onOpenMobileNav} />
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs font-medium text-[#94A3B8]">
+          <span className="hidden items-center gap-1.5 text-sm font-semibold text-[#315EA8] sm:flex">
+            <Shield aria-hidden="true" className="h-4 w-4" />
+            BrandGuard
+          </span>
+          {perspective && (
+            <>
+              <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-[#64748B] sm:block" />
+              <span className="hidden truncate text-[#94A3B8] md:inline">{perspective}</span>
+            </>
+          )}
           {breadcrumbs.map((crumb, idx) => (
             <React.Fragment key={`${crumb.label}-${idx}`}>
-              <ChevronRight className="w-3.5 h-3.5 text-[#64748B] shrink-0" />
-              {crumb.tab && idx < breadcrumbs.length - 1 ? (
-                <button
-                  onClick={() => onNavigateTab(crumb.tab!)}
-                  className="hover:text-[#F8FAFC] transition-colors cursor-pointer hover:underline underline-offset-2 shrink-0"
-                >
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#64748B]" />
+              {crumb.screen && idx < breadcrumbs.length - 1 ? (
+                <button type="button" onClick={() => onNavigate(crumb.screen)} className="truncate hover:text-[#F8FAFC]">
                   {crumb.label}
                 </button>
               ) : (
-                <span
-                  className={
-                    idx === breadcrumbs.length - 1
-                      ? 'text-[#F8FAFC] font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md'
-                      : 'text-[#94A3B8]'
-                  }
-                >
+                <span className={idx === breadcrumbs.length - 1 ? 'truncate font-semibold text-[#F8FAFC]' : 'truncate'}>
                   {crumb.label}
                 </span>
               )}
@@ -82,80 +79,46 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
       </div>
 
-      {/* Right controls: Cleanly aligned with h-9 height */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        {/* Quick Search - Perfectly vertically aligned icon and badge */}
+      <div className="flex shrink-0 items-center gap-2">
         <button
+          type="button"
           onClick={onSearchClick}
-          className="hidden sm:flex items-center justify-between h-9 px-3 w-60 md:w-72 lg:w-80 rounded-lg bg-[#111827] border border-[#253047] text-xs text-[#94A3B8] hover:border-[#3B4866] hover:text-[#F8FAFC] transition-colors cursor-pointer group"
-          title="Search guidelines, rules, copy, or audit findings (⌘K)"
+          aria-label="Search assets and guidelines"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#253047] bg-white text-xs text-[#4B5869] hover:bg-[#F4F6F9] sm:w-auto sm:justify-start sm:gap-2 sm:px-3"
         >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Search className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#94A3B8] shrink-0" />
-            <span className="truncate">Search guidelines, rules, copy...</span>
-          </div>
-          <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-[#161E2E] border border-[#253047] rounded text-[#64748B] shrink-0">
-            ⌘K
-          </kbd>
+          <Search aria-hidden="true" className="h-4 w-4" />
+          <span className="hidden md:inline">Search</span>
+          <kbd className="hidden rounded border border-[#253047] bg-[#F4F6F9] px-1.5 py-0.5 font-mono text-[10px] lg:inline">Ctrl K</kbd>
         </button>
-
-        {/* RBAC Matrix Trigger Button */}
-        {onOpenRbacModal && currentUser && (
+        {currentUser && (
           <button
+            type="button"
             onClick={onOpenRbacModal}
-            className="hidden lg:flex items-center gap-2 h-9 px-2.5 rounded-lg bg-[#161E2E] border border-[#253047] hover:border-[#6366F1] text-xs text-[#94A3B8] hover:text-[#F8FAFC] transition-colors cursor-pointer"
-            title="Inspect Role-Based Access Control matrix"
+            aria-label={`View access rules for ${roleLabel(currentUser.role)}`}
+            className="hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315EA8] sm:inline-flex"
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-[#818CF8]" />
-            <span className="font-mono text-[11px] uppercase tracking-wider text-[#64748B]">Role</span>
-            <Badge
-              variant={
-                currentUser.role === 'admin'
-                  ? 'info'
-                  : currentUser.role === 'reviewer'
-                  ? 'compliant'
-                  : 'warning'
-              }
-              size="sm"
-            >
-              {currentUser.role}
+            <Badge variant="info" size="sm">
+              {roleLabel(currentUser.role)}
             </Badge>
           </button>
         )}
-
-        {/* Notifications Bell */}
         <button
+          type="button"
           onClick={onNotificationsClick}
-          className="relative h-9 w-9 flex items-center justify-center rounded-lg bg-[#111827] border border-[#253047] text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#3B4866] hover:bg-[#161E2E] transition-colors cursor-pointer"
-          title="Audit alerts & SLA notifications"
-          aria-label="Audit alerts"
+          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#253047] bg-white text-[#4B5869] hover:bg-[#F4F6F9]"
+          aria-label="Notifications"
         >
-          <Bell className="w-4 h-4" />
-          {unreadNotificationsCount > 0 && (
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#6366F1] shadow-[0_0_6px_rgba(99,102,241,0.8)]" />
-          )}
+          <Bell aria-hidden="true" className="h-4 w-4" />
+          {unreadNotificationsCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#6366F1]" />}
         </button>
-
-        {/* Primary Action: Submit New Asset */}
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus className="w-3.5 h-3.5" />}
-          onClick={onNewAssetClick}
-          className="h-9 px-3.5"
-        >
-          Submit Content
-        </Button>
-
-        {/* Sign Out Button */}
         {onLogout && (
           <button
+            type="button"
             onClick={onLogout}
-            className="h-9 w-9 flex items-center justify-center rounded-lg bg-[#111827] border border-[#253047] text-[#64748B] hover:text-[#EF4444] hover:border-[#EF4444]/40 hover:bg-[#EF4444]/10 transition-colors cursor-pointer"
-            title="Sign out of BrandGuard AI console"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#253047] bg-white text-[#4B5869] hover:bg-[#FEF3F2] hover:text-[#B42318]"
             aria-label="Sign out"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut aria-hidden="true" className="h-4 w-4" />
           </button>
         )}
       </div>

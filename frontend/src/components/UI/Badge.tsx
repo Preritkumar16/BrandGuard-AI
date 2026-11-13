@@ -72,15 +72,15 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const sizeStyles = {
-    sm: 'h-5 px-1.5 text-[10px]',
-    md: 'h-[22px] px-2 text-[11px]',
+    sm: 'min-h-5 px-2 text-[10px]',
+    md: 'min-h-6 px-2.5 text-[11px]',
   };
 
-  const label = children || (status ? status.replace('_', ' ').toUpperCase() : '');
+  const label = children || (status ? status.replaceAll('_', ' ') : '');
 
   return (
     <span
-      className={`inline-flex items-center gap-1 font-semibold uppercase tracking-wider rounded border tabular-nums select-none ${sizeStyles[size]} ${variantStyles[computedVariant]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded border font-medium capitalize leading-5 tabular-nums select-none ${sizeStyles[size]} ${variantStyles[computedVariant]} ${className}`}
     >
       {icon}
       <span>{label}</span>

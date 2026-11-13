@@ -13,300 +13,268 @@ import {
   Sliders,
   ChevronDown,
   UserCheck,
-  Layers,
   ChevronLeft,
   ChevronRight,
   History,
-  Check,
-  Shield,
+  Upload,
+  Menu,
+  X,
 } from 'lucide-react';
 import { User } from '../../types';
 import { authService } from '../../services/API/authService';
-
-export type NavTab = 'dashboard' | 'governance-hub' | 'queue' | 'assets' | 'sources' | 'asset-detail' | 'audit-log' | 'settings';
+import { AppScreen, NavItem } from '../../config/navigation';
+import { roleLabel } from '../../config/roles';
 
 interface SidebarProps {
-  currentTab: NavTab;
-  onSelectTab: (tab: NavTab) => void;
-  queueCount: number;
+  items: NavItem[];
+  currentScreen: AppScreen;
+  onSelectScreen: (screen: AppScreen) => void;
   currentUser: User;
   onUserChanged: (user: User) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  onOpenRbacModal?: () => void;
-  onLogout?: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+  roleSupported?: boolean;
 }
 
+const ICONS: Record<string, React.ReactNode> = {
+  dashboard: <LayoutDashboard className="h-4 w-4" />,
+  assets: <FileText className="h-4 w-4" />,
+  sources: <BookOpen className="h-4 w-4" />,
+  activity: <History className="h-4 w-4" />,
+  settings: <Sliders className="h-4 w-4" />,
+  submit: <Upload className="h-4 w-4" />,
+  'asset-workspace': <FileText className="h-4 w-4" />,
+  queue: <Inbox className="h-4 w-4" />,
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
-  currentTab,
-  onSelectTab,
-  queueCount,
+  items = [],
+  currentScreen,
+  onSelectScreen,
   currentUser,
   onUserChanged,
   collapsed,
   onToggleCollapse,
-  onOpenRbacModal,
-  onLogout,
+  mobileOpen,
+  onCloseMobile,
+  roleSupported = true,
 }) => {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false);
-  const [activeWorkspace, setActiveWorkspace] = useState('Acme Global Enterprise');
+
+  // Protect the component if a missing or invalid value is passed at runtime.
+  const safeItems: NavItem[] = Array.isArray(items) ? items : [];
 
   const availableUsers = authService.getAvailableUsers();
 
-  const workspaces = [
-    { id: 'global', name: 'Acme Global Enterprise', tag: 'Production' },
-    { id: 'emea', name: 'Acme Cloud EMEA', tag: 'Sovereign' },
-    { id: 'federal', name: 'Acme Federal Defense', tag: 'GovCloud' },
-  ];
-
-  const navItems = [
-    {
-      id: 'dashboard' as NavTab,
-      label: 'Console Overview',
-      icon: <LayoutDashboard className="w-4 h-4" />,
-    },
-    {
-      id: 'governance-hub' as NavTab,
-      label: 'Governance Hub',
-      icon: <Shield className="w-4 h-4 text-[#818CF8]" />,
-    },
-    {
-      id: 'queue' as NavTab,
-      label: 'Review Queue',
-      icon: <Inbox className="w-4 h-4" />,
-      badge: queueCount > 0 ? queueCount : undefined,
-      badgeColor: 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30',
-    },
-    {
-      id: 'assets' as NavTab,
-      label: 'Asset Repository',
-      icon: <FileText className="w-4 h-4" />,
-    },
-    {
-      id: 'sources' as NavTab,
-      label: 'Brand Sources',
-      icon: <BookOpen className="w-4 h-4" />,
-    },
-    {
-      id: 'audit-log' as NavTab,
-      label: 'Audit Trail & Log',
-      icon: <History className="w-4 h-4" />,
-    },
-    {
-      id: 'settings' as NavTab,
-      label: 'Engine Settings',
-      icon: <Sliders className="w-4 h-4" />,
-    },
-  ];
+  const sections = safeItems.reduce<string[]>((list, item) => {
+    if (item?.section && !list.includes(item.section)) {
+      list.push(item.section);
+    }
+    return list;
+  }, []);
 
   return (
-    <aside
-      className={`fixed top-0 bottom-0 left-0 z-40 bg-[#0D1220] border-r border-[#253047] flex flex-col transition-all duration-200 select-none ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
-    >
-      {/* Brand Header */}
-      <div className="h-16 px-4 border-b border-[#253047] flex items-center justify-between">
-        <div
-          onClick={() => onSelectTab('dashboard')}
-          className="flex items-center gap-3 overflow-hidden cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-[#6366F1]/10 border border-[#6366F1]/30 flex items-center justify-center text-[#6366F1] shrink-0 shadow-[0_0_12px_-2px_rgba(99,102,241,0.25)]">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          {!collapsed && (
-            <div className="leading-tight truncate">
-              <span className="font-semibold text-sm tracking-tight text-[#F8FAFC]">
+    <>
+      {mobileOpen && (
+        <button
+          className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
+          aria-label="Close navigation"
+          onClick={onCloseMobile}
+        />
+      )}
+
+      <aside
+        className={`fixed bottom-0 left-0 top-0 z-40 flex w-64 flex-col border-r border-[#DCE2E9] bg-white shadow-sm transition-transform duration-200 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
+      >
+        <div className="flex h-16 items-center justify-between border-b border-[#253047] px-4">
+          <button
+            type="button"
+            onClick={() => onSelectScreen('dashboard')}
+            aria-label="BrandGuard AI home"
+            className="flex min-w-0 items-center gap-3 text-left"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#6366F1]/30 bg-[#6366F1]/10 text-[#6366F1]">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+
+            {!collapsed && (
+              <span className="truncate text-sm font-semibold text-[#F8FAFC]">
                 BrandGuard AI
               </span>
-              <span className="block text-[10px] text-[#64748B] tracking-wider uppercase font-medium">
-                Governance Platform
-              </span>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onToggleCollapse}
-          className="p-1 rounded text-[#64748B] hover:text-[#F8FAFC] hover:bg-[#161E2E] transition-colors cursor-pointer hidden md:flex items-center justify-center"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Scope / Workspace Switcher Dropdown */}
-      {!collapsed && (
-        <div className="p-3 border-b border-[#253047] relative">
-          <button
-            onClick={() => setWorkspaceDropdownOpen(!workspaceDropdownOpen)}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md bg-[#111827] border border-[#253047] text-xs hover:border-[#3B4866] transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Layers className="w-3.5 h-3.5 text-[#6366F1]" />
-              <span className="font-medium text-[#F8FAFC] truncate">{activeWorkspace}</span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#64748B]" />
+            )}
           </button>
 
-          {workspaceDropdownOpen && (
-            <div className="absolute top-12 left-3 right-3 bg-[#161E2E] border border-[#253047] rounded-lg shadow-xl p-1 z-50 space-y-1">
-              <div className="px-2 py-1 text-[10px] text-[#64748B] uppercase font-semibold border-b border-[#253047]">
-                Select Brand Scope
+          <button
+          onClick={onToggleCollapse}
+            className="hidden rounded p-1 text-[#64748B] hover:bg-[#161E2E] hover:text-[#F8FAFC] lg:flex"
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
+
+          <button
+            onClick={onCloseMobile}
+            className="rounded p-1 text-[#94A3B8] lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <nav aria-label="Main navigation" className="flex-1 space-y-3 overflow-y-auto p-3">
+          {sections.map(section => (
+            <div key={section}>
+              {!collapsed && (
+                <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B]">
+                  {section}
+                </p>
+              )}
+
+              <div className="space-y-1">
+                {safeItems
+                  .filter(item => item?.section === section)
+                  .map(item => {
+                    const active = currentScreen === item.id;
+
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => onSelectScreen(item.id)}
+                        aria-current={active ? 'page' : undefined}
+                        title={collapsed ? item.label : undefined}
+                        className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium ${
+                          active
+                            ? 'border border-[#C9D8EA] bg-[#EEF4FA] text-[#1B2533] shadow-sm'
+                            : 'text-[#4B5869] hover:bg-[#F4F6F9] hover:text-[#1B2533]'
+                        }`}
+                      >
+                        <span
+                          className={
+                            active ? 'text-[#315EA8]' : 'text-[#64748B]'
+                          }
+                        >
+                          {ICONS[item.id] ?? (
+                            <LayoutDashboard className="h-4 w-4" />
+                          )}
+                        </span>
+
+                        {!collapsed && (
+                          <span className="truncate">{item.label}</span>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
-              {workspaces.map(ws => (
+            </div>
+            ))}
+        </nav>
+
+        <div className="relative border-t border-[#253047] p-3">
+          {!collapsed && (
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B]">
+              Active perspective
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setUserDropdownOpen(open => !open)}
+            aria-expanded={userDropdownOpen && !collapsed}
+            aria-haspopup="menu"
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#253047] bg-[#111827] p-2"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#6366F1]/40 bg-[#6366F1]/20 text-[10px] font-semibold text-[#818CF8]">
+                {currentUser.avatar ||
+                  currentUser.name.slice(0, 2).toUpperCase()}
+              </span>
+
+              {!collapsed && (
+                <span className="min-w-0 text-left">
+                  <span className="block truncate text-xs font-medium text-[#F8FAFC]">
+                    {currentUser.name}
+                  </span>
+                  <span className="block truncate text-[10px] text-[#94A3B8]">
+                    {roleLabel(currentUser.role)}
+                  </span>
+                </span>
+              )}
+            </span>
+
+            {!collapsed && (
+              <ChevronDown className="h-3.5 w-3.5 text-[#64748B]" />
+            )}
+          </button>
+
+          {userDropdownOpen && !collapsed && (
+            <div role="menu" className="absolute bottom-16 left-3 right-3 z-50 space-y-1 rounded-lg border border-[#253047] bg-[#161E2E] p-1 shadow-lg">
+              <p className="border-b border-[#253047] px-2 py-1 text-[10px] uppercase text-[#64748B]">
+                Preview persona
+              </p>
+
+              {availableUsers.map(user => (
                 <button
-                  key={ws.id}
-                  onClick={() => {
-                    setActiveWorkspace(ws.name);
-                    setWorkspaceDropdownOpen(false);
+                  type="button"
+                  role="menuitem"
+                  key={user.id}
+                  onClick={async () => {
+                    const switched = await authService.switchUser(user.id);
+                    onUserChanged(switched);
+                    setUserDropdownOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-left text-xs transition-colors cursor-pointer ${
-                    activeWorkspace === ws.name
-                      ? 'bg-[#6366F1]/20 text-[#818CF8] font-medium'
-                      : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#253047]/50'
+                  className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${
+                    user.id === currentUser.id
+                      ? 'bg-[#6366F1]/20 text-[#C7D2FE]'
+                      : 'text-[#94A3B8] hover:bg-[#253047]/50'
                   }`}
                 >
-                  <span>{ws.name}</span>
-                  <span className="text-[10px] text-[#64748B] font-mono">{ws.tag}</span>
+                  <span>
+                    <span className="block text-[#F8FAFC]">{user.name}</span>
+                    <span className="block text-[10px] text-[#64748B]">
+                      {roleLabel(user.role)}
+                    </span>
+                  </span>
+
+                  {user.id === currentUser.id && (
+                    <UserCheck className="h-3.5 w-3.5" />
+                  )}
                 </button>
               ))}
             </div>
           )}
+
+          {!roleSupported && !collapsed && (
+            <p className="mt-2 text-[10px] leading-relaxed text-[#F59E0B]">
+              This role was not recognised. Showing the narrowest workspace.
+            </p>
+          )}
+
         </div>
-      )}
+      </aside>
+    </>
+  );
+};
 
-      {/* Navigation Links */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        <div className="text-[10px] uppercase font-semibold tracking-wider text-[#64748B] px-2.5 py-1.5">
-          {!collapsed ? 'Governance Controls' : '•'}
-        </div>
-        {navItems.map(item => {
-          const isActive = currentTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectTab(item.id)}
-              title={collapsed ? item.label : undefined}
-              className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs font-medium transition-all duration-150 cursor-pointer ${
-                isActive
-                  ? 'bg-[#161E2E] text-[#F8FAFC] border border-[#253047] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
-                  : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#161E2E]/50'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className={isActive ? 'text-[#6366F1]' : 'text-[#64748B]'}>{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
-              </div>
-              {!collapsed && item.badge && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${item.badgeColor || 'bg-[#253047] text-[#94A3B8]'}`}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Role / User Simulation Panel */}
-      <div className="p-3 border-t border-[#253047] relative">
-        {!collapsed && (
-          <div className="text-[10px] uppercase font-semibold tracking-wider text-[#64748B] px-1 mb-2 flex items-center justify-between">
-            <span>Active Persona</span>
-            <span className="text-[9px] text-[#6366F1] font-mono">Rule 6 Tester</span>
-          </div>
-        )}
-
-        <button
-          onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-          className={`w-full flex items-center justify-between p-2 rounded-lg bg-[#111827] border border-[#253047] hover:border-[#3B4866] transition-colors cursor-pointer ${
-            collapsed ? 'justify-center' : ''
-          }`}
-          title={`${currentUser.name} (${currentUser.role})`}
-        >
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-md bg-[#6366F1]/20 border border-[#6366F1]/40 flex items-center justify-center text-xs font-semibold text-[#818CF8] shrink-0">
-              {currentUser.avatar || currentUser.name.slice(0, 2).toUpperCase()}
-            </div>
-            {!collapsed && (
-              <div className="text-left truncate">
-                <div className="text-xs font-medium text-[#F8FAFC] truncate">
-                  {currentUser.name}
-                </div>
-                <div className="text-[10px] text-[#94A3B8] truncate capitalize flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    currentUser.role === 'reviewer' ? 'bg-[#10B981]' : 'bg-[#6366F1]'
-                  }`} />
-                  {currentUser.role}
-                </div>
-              </div>
-            )}
-          </div>
-          {!collapsed && <ChevronDown className="w-3.5 h-3.5 text-[#64748B]" />}
-        </button>
-
-        {/* User Switcher Dropdown */}
-        {userDropdownOpen && !collapsed && (
-          <div className="absolute bottom-16 left-3 right-3 bg-[#161E2E] border border-[#253047] rounded-lg shadow-xl p-1 z-50 space-y-1">
-            <div className="px-2 py-1 text-[10px] text-[#64748B] uppercase font-semibold border-b border-[#253047] mb-1">
-              Switch Persona for Approval Rules
-            </div>
-            {availableUsers.map(user => (
-              <button
-                key={user.id}
-                onClick={async () => {
-                  const switched = await authService.switchUser(user.id);
-                  onUserChanged(switched);
-                  setUserDropdownOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-left text-xs transition-colors cursor-pointer ${
-                  user.id === currentUser.id
-                    ? 'bg-[#6366F1]/20 text-[#818CF8] font-medium'
-                    : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#253047]/50'
-                }`}
-              >
-                <div>
-                  <div className="text-xs text-[#F8FAFC] font-medium">{user.name}</div>
-                  <div className="text-[10px] text-[#64748B]">{user.title}</div>
-                </div>
-                {user.id === currentUser.id && <UserCheck className="w-3.5 h-3.5 text-[#6366F1]" />}
-              </button>
-            ))}
-          </div>
-        )}
-        {/* RBAC & Sign Out Controls */}
-        {!collapsed && (
-          <div className="mt-2 pt-2 border-t border-[#253047]/60 flex items-center justify-between text-xs">
-            {onOpenRbacModal && (
-              <button
-                onClick={onOpenRbacModal}
-                className="text-[11px] text-[#818CF8] hover:text-[#C0C1FF] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-              >
-                <span>RBAC Matrix</span>
-              </button>
-            )}
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="text-[11px] text-[#94A3B8] hover:text-[#EF4444] transition-colors cursor-pointer"
-              >
-                Sign Out
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Footer Info */}
-      {!collapsed && (
-        <div className="px-4 py-2 border-t border-[#253047] flex items-center justify-between text-[10px] text-[#64748B] tabular-nums font-mono">
-          <span>v2.4.0-sentinel</span>
-          <span className="flex items-center gap-1 text-[#10B981]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-            ENGINE READY
-          </span>
-        </div>
-      )}
-    </aside>
+export const MobileMenuButton: React.FC<{ onClick: () => void }> = ({
+  onClick,
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#253047] bg-[#111827] text-[#94A3B8] lg:hidden"
+      aria-label="Open navigation"
+    >
+      <Menu className="h-4 w-4" />
+    </button>
   );
 };

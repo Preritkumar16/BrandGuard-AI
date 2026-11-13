@@ -19,14 +19,18 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, options, error, className = '', id, ...props }, ref) => {
-    const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const generatedId = React.useId();
+    const selectId = id || generatedId;
+    const describedBy = [props['aria-describedby'], error ? `${selectId}-error` : undefined]
+      .filter(Boolean)
+      .join(' ') || undefined;
 
     return (
       <div className="w-full space-y-1.5">
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-xs font-medium text-[#94A3B8] tracking-wide"
+            className="block text-sm font-medium text-[#4B5869]"
           >
             {label}
           </label>
@@ -35,22 +39,24 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           <select
             id={selectId}
             ref={ref}
-            className={`w-full h-9 appearance-none rounded-md bg-[#0D1220] border text-sm text-[#F8FAFC] pl-3 pr-8 transition-colors duration-150 focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] cursor-pointer ${
+            className={`w-full h-10 appearance-none rounded-md bg-white border text-sm text-[#1B2533] pl-3 pr-8 transition-colors duration-150 focus-visible:outline-none focus-visible:border-[#315EA8] focus-visible:ring-2 focus-visible:ring-[#315EA8]/20 cursor-pointer ${
               error ? 'border-[#EF4444]' : 'border-[#253047]'
             } ${className}`}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={describedBy}
             {...props}
           >
             {options.map(opt => (
-              <option key={opt.value} value={opt.value} className="bg-[#111827] text-[#F8FAFC]">
+              <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <div className="absolute right-2.5 text-[#64748B] pointer-events-none flex items-center">
+          <div aria-hidden="true" className="absolute right-2.5 text-[#64748B] pointer-events-none flex items-center">
             <ChevronDown className="w-4 h-4" />
           </div>
         </div>
-        {error && <p className="text-xs text-[#EF4444] mt-1">{error}</p>}
+        {error && <p id={`${selectId}-error`} className="text-sm text-[#B42318] mt-1">{error}</p>}
       </div>
     );
   }

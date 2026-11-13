@@ -8,27 +8,43 @@ import { User, BrandSource, Asset, AuditFinding, ReviewQueueItem } from '../../t
 export const MOCK_USERS: User[] = [
   {
     id: 'user-creator',
-    name: 'Sarah Lin',
-    email: 'sarah.lin@brandguard.internal',
+    name: 'Rohit Sharma',
+    email: 'rohit.sharma@brandguard.internal',
     role: 'creator',
-    title: 'Senior Product Marketing Lead',
-    avatar: 'SL',
+    title: 'Creator',
+    avatar: 'RS',
   },
   {
     id: 'user-reviewer',
-    name: 'Marcus Vance',
-    email: 'marcus.vance@brandguard.internal',
+    name: 'Ananya Mehta',
+    email: 'ananya.mehta@brandguard.internal',
     role: 'reviewer',
-    title: 'Head of Brand Governance & Compliance',
-    avatar: 'MV',
+    title: 'Reviewer',
+    avatar: 'AM',
   },
   {
     id: 'user-admin',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@brandguard.internal',
+    name: 'Arjun Patel',
+    email: 'arjun.patel@brandguard.internal',
     role: 'admin',
-    title: 'VP of Global Brand Operations',
-    avatar: 'ER',
+    title: 'Admin',
+    avatar: 'AP',
+  },
+  {
+    id: 'user-source-owner',
+    name: 'Priya Sharma',
+    email: 'priya.sharma@brandguard.internal',
+    role: 'source_owner',
+    title: 'Brand Manager',
+    avatar: 'PS',
+  },
+  {
+    id: 'user-compliance',
+    name: 'Rahul Verma',
+    email: 'rahul.verma@brandguard.internal',
+    role: 'compliance_reviewer',
+    title: 'Compliance Reviewer',
+    avatar: 'RV',
   },
 ];
 
@@ -181,7 +197,7 @@ export const MOCK_ASSETS: Asset[] = [
     title: 'Q4 Enterprise SentinelMesh Launch Announcement',
     channel: 'linkedin',
     campaign: 'Fall 2026 Global Enterprise Rollout',
-    created_by: MOCK_USERS[0], // Sarah Lin (Creator)
+    created_by: MOCK_USERS[0], // Rohit Sharma (Creator)
     created_at: '2026-11-04T10:14:00Z',
     updated_at: '2026-11-07T08:30:00Z',
     current_status: 'review_required',
@@ -279,7 +295,7 @@ Learn how infrastructure leaders orchestrate compliance with rigorous architectu
         review_decision: {
           decision_id: 'dec-apac-991',
           version_id: 'ver-apac-1.1',
-          reviewer: MOCK_USERS[1], // Marcus Vance (Reviewer)
+          reviewer: MOCK_USERS[1], // Ananya Mehta (Reviewer)
           decision: 'approved',
           notes: 'Full regulatory compliance verified against Legal Source v3.2 Section 5.3. Regional disclaimers accurate.',
           timestamp: '2026-11-06T16:10:00Z',
@@ -292,7 +308,7 @@ Learn how infrastructure leaders orchestrate compliance with rigorous architectu
     title: 'Financial Services Executive Executive Briefing',
     channel: 'email',
     campaign: 'Banking & Capital Markets',
-    created_by: MOCK_USERS[1], // Created by Marcus Vance
+    created_by: MOCK_USERS[1], // Created by Ananya Mehta
     created_at: '2026-11-01T09:30:00Z',
     updated_at: '2026-11-06T11:45:00Z',
     current_status: 'in_review',
@@ -453,7 +469,7 @@ export const MOCK_REVIEW_QUEUE: ReviewQueueItem[] = [
     asset_title: 'Q4 Enterprise SentinelMesh Launch Announcement',
     channel: 'linkedin',
     version_number: 'v1.2',
-    creator: MOCK_USERS[0], // Sarah Lin
+    creator: MOCK_USERS[0], // Rohit Sharma
     submitted_at: '2026-11-07T08:35:00Z',
     priority: 'high',
     breach_count: 0,
@@ -467,7 +483,7 @@ export const MOCK_REVIEW_QUEUE: ReviewQueueItem[] = [
     asset_title: 'Financial Services Executive Executive Briefing',
     channel: 'email',
     version_number: 'v1.0',
-    creator: MOCK_USERS[1], // Marcus Vance
+    creator: MOCK_USERS[1], // Ananya Mehta
     submitted_at: '2026-11-06T16:00:00Z',
     priority: 'medium',
     breach_count: 0,
