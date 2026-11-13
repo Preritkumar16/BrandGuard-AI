@@ -187,22 +187,17 @@ export default function App() {
 
   // Data Loading function (excludes getMe)
   const refreshAllData = async () => {
-    try {
-      setIsLoading(true);
-      const [assetsData, sourcesData, queueData] = await Promise.all([
-        assetsService.getAssets(),
-        sourcesService.getSources(),
-        reviewsService.getQueue(),
-      ]);
-      setAssets(assetsData);
-      setSources(sourcesData);
-      setQueue(queueData);
-    } catch (error) {
-      console.error('Failed to load application data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    setIsLoading(true);
+
+    const sourcesData = await sourcesService.getSources();
+    setSources(sourcesData);
+  } catch (error) {
+    console.error('Failed to load brand sources:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Load application data only after successful authentication.
   useEffect(() => {
