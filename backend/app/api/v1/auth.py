@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database.session import get_db
 from app.models.organisation import Organisation
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.api.deps import get_current_user
@@ -30,7 +30,7 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
         name=user_data.name,
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
-        role=user_data.role,
+        role=UserRole.ADMIN,
         is_active=True
     )
     db.add(user)

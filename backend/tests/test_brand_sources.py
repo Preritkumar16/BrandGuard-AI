@@ -14,12 +14,12 @@ async def test_auth_and_brand_source_workflow():
             "organisation_name": "Governance Corp",
             "name": "Audit Admin",
             "email": unique_email,
-            "password": "securepassword123",
-            "role": "ADMIN"
+            "password": "securepassword123"
         })
         assert reg_response.status_code == 201
         data = reg_response.json()
         assert data["email"] == unique_email
+        assert data["role"] == "ADMIN"
 
         # 2. Login to get JWT token
         login_response = await ac.post("/api/v1/auth/login", json={
