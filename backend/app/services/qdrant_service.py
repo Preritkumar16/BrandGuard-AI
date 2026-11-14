@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 
 _embedding_model = None
 
-qdrant_client = AsyncQdrantClient(url=settings.QDRANT_URL)
-
+qdrant_client = AsyncQdrantClient(
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY or None,
+)
 COLLECTION_NAME = settings.QDRANT_COLLECTION
 VECTOR_SIZE = 384
 

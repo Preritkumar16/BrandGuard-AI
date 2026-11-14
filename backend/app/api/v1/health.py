@@ -11,9 +11,9 @@ from app.core.config import settings
 router = APIRouter(tags=["Health"])
 
 qdrant_client = AsyncQdrantClient(
-    url=settings.QDRANT_URL
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY or None,
 )
-
 
 @router.get("/health")
 async def health_check():

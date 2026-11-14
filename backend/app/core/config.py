@@ -8,14 +8,18 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION: str = "brand_source_chunks"
 
-    SECRET_KEY: str = "super-secret-key-change-in-production"
+    SECRET_KEY: str 
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
+
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
+
+    # Comma-separated frontend origins
+    CORS_ORIGINS: str = "https://brand-guard-ai-kohl.vercel.app"
 
     model_config = SettingsConfigDict(
         env_file=".env",
